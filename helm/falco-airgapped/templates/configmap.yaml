@@ -1,0 +1,151 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "falco-airgapped.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "falco-airgapped.labels" . | nindent 4 }}
+data:
+  falco.yaml: |-
+    # Falco configuration
+    rules_file:
+    {{- range .Values.falco.config.rulesFiles }}
+      - {{ . }}
+    {{- end }}
+    
+    # Plugins configuration
+    plugins:
+    {{- range .Values.falco.config.plugins }}
+      - name: {{ .name }}
+        library_path: {{ .library_path }}
+        {{- if .init_config }}
+        init_config: {{ .init_config | quote }}
+        {{- else }}
+        init_config: ""
+        {{- end }}
+        {{- if .open_params }}
+        open_params: {{ .open_params | quote }}
+        {{- else }}
+        open_params: ""
+        {{- end }}
+    {{- end }}
+    
+    # Load plugins
+    load_plugins:
+    {{- range .Values.falco.config.loadPlugins }}
+      - {{ . }}
+    {{- end }}
+    
+    # Watch config file for changes
+    watch_config_files: true
+    
+    # Logging
+    log_stderr: {{ .Values.falco.config.logStderr }}
+    log_syslog: {{ .Values.falco.config.logSyslog }}
+    log_level: {{ .Values.falco.config.logLevel }}
+    
+    # Output channels
+    stdout_output:
+      enabled: {{ .Values.falco.config.stdoutOutput.enabled }}
+    
+    file_output:
+      enabled: {{ .Values.falco.config.fileOutput.enabled }}
+      keep_alive: {{ .Values.falco.config.fileOutput.keepAlive }}
+      filename: {{ .Values.falco.config.fileOutput.filename }}
+    
+    {{- if .Values.falco.config.httpOutput.enabled }}
+    http_output:
+      enabled: {{ .Values.falco.config.httpOutput.enabled }}
+      url: {{ .Values.falco.config.httpOutput.url | quote }}
+    {{- end }}
+    
+    # gRPC server
+    grpc:
+      enabled: {{ .Values.falco.config.grpc.enabled }}
+      bind_address: {{ .Values.falco.config.grpc.bindAddress | quote }}
+      threadiness: {{ .Values.falco.config.grpc.threadiness }}
+    
+    # gRPC output
+    grpc_output:
+      enabled: {{ .Values.falco.config.grpcOutput.enabled }}
+    
+    # Metrics
+    metrics:
+      enabled: {{ .Values.falco.config.metrics.enabled }}
+      interval: {{ .Values.falco.config.metrics.interval }}
+      output_rule: {{ .Values.falco.config.metrics.outputRule }}
+      resource_utilization_enabled: {{ .Values.falco.config.metrics.resourceUtilizationEnabled }}
+      state_counters_enabled: {{ .Values.falco.config.metrics.stateCountersEnabled }}
+      kernel_event_counters_enabled: {{ .Values.falco.config.metrics.kernelEventCountersEnabled }}
+      libbpf_stats_enabled: {{ .Values.falco.config.metrics.libbpfStatsEnabled }}
+    
+    # Webserver for metrics and health checks
+    webserver:
+      enabled: {{ .Values.falco.config.webserver.enabled }}
+      listen_port: {{ .Values.falco.config.webserver.listenPort }}
+      k8s_healthz_endpoint: {{ .Values.falco.config.webserver.k8sHealthzEndpoint }}
+      ssl_enabled: {{ .Values.falco.config.webserver.sslEnabled }}
+    
+    # Syscall event drops
+    syscall_event_drops:
+      threshold: 0.1
+      actions:
+        - log
+        - alert
+      rate: 0.03333
+      max_burst: 1
+    
+    # Syscall event timeouts
+    syscall_event_timeouts:
+      max_consecutives: 1000
+    
+    # Output formatting
+    output_timeout: 2000
+    outputs:
+      rate: 1
+      max_burst: 1000
+    
+    # Priority level for rules
+    priority: debug
+    
+    # Buffered outputs
+    buffered_outputs: false
+    
+    # Syscall buffer size
+    syscall_buf_size_preset: 4
+    
+    # Base syscalls
+    base_syscalls:
+      custom_set: []
+      repair: false
+    
+    # Engine configuration
+    engine:
+      kind: {{ .Values.falco.config.engine.kind }}
+      {{- if eq .Values.falco.config.engine.kind "modern_bpf" }}
+      modern_bpf:
+        cpus_for_each_syscall_buffer: {{ .Values.falco.config.engine.modernBpf.cpusForEachSyscallBuffer }}
+      {{- end }}
+      kmod:
+        buf_size_preset: 4
+      ebpf:
+        buf_size_preset: 4
+        drop_failed_exit: false
+
+{{- if .Values.customRules }}
+---
+{{- range $name, $content := .Values.customRules }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "falco-airgapped.fullname" $ }}-rules-{{ $name | replace "." "-" | replace "_" "-" | lower }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "falco-airgapped.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: rules
+data:
+  {{ $name }}: |-
+{{ $content | indent 4 }}
+---
+{{- end }}
+{{- end }}

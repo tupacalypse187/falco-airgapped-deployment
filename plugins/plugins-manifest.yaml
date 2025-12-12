@@ -1,0 +1,80 @@
+---
+# Falco Plugins Manifest
+# This file tracks plugin versions, sources, and checksums for air-gapped deployment
+
+plugins:
+  - name: k8saudit-eks
+    version: "0.10.0"
+    description: "Read Kubernetes Audit Events from AWS EKS Clusters"
+    source_registry: "ghcr.io/falcosecurity/plugins/plugin/k8saudit-eks"
+    plugin_id: 9
+    capabilities:
+      - event_sourcing
+      - field_extraction
+    event_source: "k8s_audit"
+    filename: "k8saudit-eks-0.10.0.so"
+    install_path: "/usr/share/falco/plugins/k8saudit-eks.so"
+    config_required: true
+    config_example:
+      s3_bucket: "my-eks-audit-logs"
+      s3_prefix: "AWSLogs/"
+      aws_region: "us-east-1"
+    
+  - name: container
+    version: "0.4.1"
+    description: "Enrich Falco syscall flow with Container Metadata"
+    source_registry: "ghcr.io/falcosecurity/plugins/plugin/container"
+    capabilities:
+      - field_extraction
+    event_source: "syscall"
+    filename: "container-0.4.1.so"
+    install_path: "/usr/share/falco/plugins/container.so"
+    config_required: false
+
+# Deployment methods for air-gapped environments
+deployment_methods:
+  sidecar:
+    description: "Use init container to copy plugins from plugin-loader image"
+    advantages:
+      - "Simple to implement"
+      - "Plugins versioned with container images"
+      - "Works with any Kubernetes distribution"
+    requirements:
+      - "Build custom plugin-loader container image"
+      - "Configure shared volume between init and main containers"
+    
+  s3_bucket:
+    description: "Download plugins from private S3 bucket during startup"
+    advantages:
+      - "Centralized plugin management"
+      - "Easy to update plugins without rebuilding images"
+      - "Supports multiple clusters from single source"
+    requirements:
+      - "Private S3 bucket in same VPC or with VPC endpoint"
+      - "IAM role with S3 read permissions"
+      - "Init script to download plugins before Falco starts"
+
+# Private registry configuration
+private_registries:
+  ecr:
+    description: "AWS Elastic Container Registry"
+    base_url: "<account-id>.dkr.ecr.<region>.amazonaws.com"
+    namespaces:
+      falco_images: "falcosecurity"
+      plugin_loader: "falcosecurity"
+    authentication: "IAM role or ECR credentials"
+  
+  local:
+    description: "Local registry for testing (Docker Desktop / Minikube)"
+    base_url: "localhost:5000"
+    namespaces:
+      falco_images: "falcosecurity"
+      plugin_loader: "falcosecurity"
+    authentication: "none"
+
+# Build information
+build_info:
+  base_image: "almalinux:9"
+  falco_version: "0.41.0"
+  cmake_requirement: ">=3.20"
+  note: "Plugins are pre-built .so files extracted from official GHCR images"

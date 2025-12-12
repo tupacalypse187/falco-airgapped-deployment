@@ -1,0 +1,396 @@
+// Jenkinsfile for Falco Air-Gapped Deployment to AWS EKS
+// This pipeline builds container images and deploys Falco to EKS
+
+pipeline {
+    agent {
+        label 'docker'
+    }
+    
+    parameters {
+        choice(
+            name: 'DEPLOYMENT_ENV',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Target deployment environment'
+        )
+        choice(
+            name: 'PLUGIN_STRATEGY',
+            choices: ['sidecar', 's3'],
+            description: 'Plugin loading strategy'
+        )
+        string(
+            name: 'FALCO_VERSION',
+            defaultValue: '0.41.0',
+            description: 'Falco version to build'
+        )
+        string(
+            name: 'ECR_REGISTRY',
+            defaultValue: '',
+            description: 'ECR registry URL (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com)'
+        )
+        string(
+            name: 'EKS_CLUSTER_NAME',
+            defaultValue: '',
+            description: 'EKS cluster name'
+        )
+        string(
+            name: 'AWS_REGION',
+            defaultValue: 'us-east-1',
+            description: 'AWS region'
+        )
+        string(
+            name: 'S3_BUCKET',
+            defaultValue: '',
+            description: 'S3 bucket for plugins (required if using S3 strategy)'
+        )
+        booleanParam(
+            name: 'BUILD_IMAGES',
+            defaultValue: true,
+            description: 'Build and push container images'
+        )
+        booleanParam(
+            name: 'DEPLOY_TO_EKS',
+            defaultValue: true,
+            description: 'Deploy to EKS cluster'
+        )
+    }
+    
+    environment {
+        // AWS credentials (configured in Jenkins)
+        AWS_CREDENTIALS = credentials('aws-credentials')
+        
+        // ECR credentials
+        ECR_REGISTRY = "${params.ECR_REGISTRY}"
+        
+        // Image tags
+        FALCO_BASE_IMAGE = "${ECR_REGISTRY}/falcosecurity/falco:${params.FALCO_VERSION}-almalinux9"
+        FALCO_S3_IMAGE = "${ECR_REGISTRY}/falcosecurity/falco:${params.FALCO_VERSION}-s3-almalinux9"
+        PLUGIN_LOADER_IMAGE = "${ECR_REGISTRY}/falcosecurity/falco-plugin-loader:1.0.0"
+        
+        // Kubernetes namespace
+        K8S_NAMESPACE = "falco-${params.DEPLOYMENT_ENV}"
+        
+        // Helm release name
+        HELM_RELEASE = "falco-${params.DEPLOYMENT_ENV}"
+    }
+    
+    stages {
+        stage('Validate Parameters') {
+            steps {
+                script {
+                    echo "========================================="
+                    echo "Falco Air-Gapped Deployment Pipeline"
+                    echo "========================================="
+                    echo "Environment: ${params.DEPLOYMENT_ENV}"
+                    echo "Plugin Strategy: ${params.PLUGIN_STRATEGY}"
+                    echo "Falco Version: ${params.FALCO_VERSION}"
+                    echo "ECR Registry: ${params.ECR_REGISTRY}"
+                    echo "EKS Cluster: ${params.EKS_CLUSTER_NAME}"
+                    echo "AWS Region: ${params.AWS_REGION}"
+                    echo "========================================="
+                    
+                    // Validate required parameters
+                    if (!params.ECR_REGISTRY) {
+                        error("ECR_REGISTRY parameter is required")
+                    }
+                    
+                    if (params.DEPLOY_TO_EKS && !params.EKS_CLUSTER_NAME) {
+                        error("EKS_CLUSTER_NAME is required when DEPLOY_TO_EKS is true")
+                    }
+                    
+                    if (params.PLUGIN_STRATEGY == 's3' && !params.S3_BUCKET) {
+                        error("S3_BUCKET is required when using S3 plugin strategy")
+                    }
+                }
+            }
+        }
+        
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Extract Plugins') {
+            when {
+                expression { params.BUILD_IMAGES == true }
+            }
+            steps {
+                script {
+                    echo "Extracting Falco plugins from GHCR..."
+                    sh '''
+                        chmod +x scripts/local/extract-plugins.sh
+                        bash scripts/local/extract-plugins.sh
+                    '''
+                    
+                    // Verify plugins were extracted
+                    sh '''
+                        if [ ! -f plugins/extracted/*.so ]; then
+                            echo "ERROR: No plugins were extracted!"
+                            exit 1
+                        fi
+                        echo "Extracted plugins:"
+                        ls -lh plugins/extracted/*.so
+                    '''
+                }
+            }
+        }
+        
+        stage('Upload Plugins to S3') {
+            when {
+                allOf {
+                    expression { params.BUILD_IMAGES == true }
+                    expression { params.PLUGIN_STRATEGY == 's3' }
+                }
+            }
+            steps {
+                script {
+                    echo "Uploading plugins to S3 bucket: ${params.S3_BUCKET}"
+                    sh '''
+                        aws s3 sync plugins/extracted/ \
+                            s3://${S3_BUCKET}/falco-plugins/ \
+                            --region ${AWS_REGION} \
+                            --exclude "*" \
+                            --include "*.so"
+                        
+                        echo "Uploaded plugins:"
+                        aws s3 ls s3://${S3_BUCKET}/falco-plugins/ --region ${AWS_REGION}
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Container Images') {
+            when {
+                expression { params.BUILD_IMAGES == true }
+            }
+            parallel {
+                stage('Build Falco Base Image') {
+                    steps {
+                        script {
+                            echo "Building Falco base image..."
+                            dir('docker/base') {
+                                sh """
+                                    docker build \
+                                        -t ${FALCO_BASE_IMAGE} \
+                                        -f Dockerfile \
+                                        --build-arg FALCO_VERSION=${params.FALCO_VERSION} \
+                                        .
+                                """
+                            }
+                        }
+                    }
+                }
+                
+                stage('Build Falco S3 Image') {
+                    steps {
+                        script {
+                            echo "Building Falco S3 loader image..."
+                            dir('docker/base') {
+                                sh """
+                                    docker build \
+                                        -t ${FALCO_S3_IMAGE} \
+                                        -f Dockerfile.s3-loader \
+                                        --build-arg FALCO_VERSION=${params.FALCO_VERSION} \
+                                        .
+                                """
+                            }
+                        }
+                    }
+                }
+                
+                stage('Build Plugin Loader Image') {
+                    when {
+                        expression { params.PLUGIN_STRATEGY == 'sidecar' }
+                    }
+                    steps {
+                        script {
+                            echo "Building plugin loader image..."
+                            dir('docker/plugin-loader') {
+                                sh '''
+                                    mkdir -p plugins
+                                    cp ../../plugins/extracted/*.so plugins/
+                                    
+                                    docker build \
+                                        -t ${PLUGIN_LOADER_IMAGE} \
+                                        -f Dockerfile \
+                                        .
+                                    
+                                    rm -rf plugins
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Login to ECR') {
+            when {
+                expression { params.BUILD_IMAGES == true }
+            }
+            steps {
+                script {
+                    echo "Logging in to ECR..."
+                    sh '''
+                        aws ecr get-login-password --region ${AWS_REGION} | \
+                            docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                    '''
+                }
+            }
+        }
+        
+        stage('Push Images to ECR') {
+            when {
+                expression { params.BUILD_IMAGES == true }
+            }
+            parallel {
+                stage('Push Falco Base') {
+                    steps {
+                        script {
+                            echo "Pushing Falco base image to ECR..."
+                            sh "docker push ${FALCO_BASE_IMAGE}"
+                        }
+                    }
+                }
+                
+                stage('Push Falco S3') {
+                    steps {
+                        script {
+                            echo "Pushing Falco S3 image to ECR..."
+                            sh "docker push ${FALCO_S3_IMAGE}"
+                        }
+                    }
+                }
+                
+                stage('Push Plugin Loader') {
+                    when {
+                        expression { params.PLUGIN_STRATEGY == 'sidecar' }
+                    }
+                    steps {
+                        script {
+                            echo "Pushing plugin loader image to ECR..."
+                            sh "docker push ${PLUGIN_LOADER_IMAGE}"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Configure kubectl') {
+            when {
+                expression { params.DEPLOY_TO_EKS == true }
+            }
+            steps {
+                script {
+                    echo "Configuring kubectl for EKS cluster..."
+                    sh """
+                        aws eks update-kubeconfig \
+                            --name ${params.EKS_CLUSTER_NAME} \
+                            --region ${params.AWS_REGION}
+                        
+                        kubectl cluster-info
+                    """
+                }
+            }
+        }
+        
+        stage('Create Namespace') {
+            when {
+                expression { params.DEPLOY_TO_EKS == true }
+            }
+            steps {
+                script {
+                    echo "Creating namespace: ${K8S_NAMESPACE}"
+                    sh """
+                        kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    """
+                }
+            }
+        }
+        
+        stage('Deploy Falco with Helm') {
+            when {
+                expression { params.DEPLOY_TO_EKS == true }
+            }
+            steps {
+                script {
+                    echo "Deploying Falco to EKS..."
+                    
+                    // Prepare Helm values based on plugin strategy
+                    def imageTag = params.PLUGIN_STRATEGY == 's3' ? "${params.FALCO_VERSION}-s3-almalinux9" : "${params.FALCO_VERSION}-almalinux9"
+                    
+                    sh """
+                        cd helm/falco-airgapped
+                        
+                        helm upgrade --install ${HELM_RELEASE} . \
+                            --namespace ${K8S_NAMESPACE} \
+                            --set image.registry=${ECR_REGISTRY} \
+                            --set image.repository=falcosecurity/falco \
+                            --set image.tag=${imageTag} \
+                            --set pluginLoadingStrategy=${params.PLUGIN_STRATEGY} \
+                            --set pluginLoader.enabled=${params.PLUGIN_STRATEGY == 'sidecar'} \
+                            --set pluginLoader.image.registry=${ECR_REGISTRY} \
+                            --set pluginLoader.image.repository=falcosecurity/falco-plugin-loader \
+                            --set pluginLoader.image.tag=1.0.0 \
+                            --set s3PluginLoader.enabled=${params.PLUGIN_STRATEGY == 's3'} \
+                            --set s3PluginLoader.bucket=${params.S3_BUCKET} \
+                            --set s3PluginLoader.region=${params.AWS_REGION} \
+                            --wait \
+                            --timeout 10m
+                    """
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            when {
+                expression { params.DEPLOY_TO_EKS == true }
+            }
+            steps {
+                script {
+                    echo "Verifying Falco deployment..."
+                    sh """
+                        echo "Waiting for Falco pods to be ready..."
+                        kubectl wait --for=condition=ready pod \
+                            -l app.kubernetes.io/name=falco-airgapped \
+                            -n ${K8S_NAMESPACE} \
+                            --timeout=300s || true
+                        
+                        echo "Falco DaemonSet status:"
+                        kubectl get daemonset -n ${K8S_NAMESPACE}
+                        
+                        echo "Falco pods:"
+                        kubectl get pods -n ${K8S_NAMESPACE} -l app.kubernetes.io/name=falco-airgapped
+                        
+                        echo "Recent Falco logs:"
+                        kubectl logs -n ${K8S_NAMESPACE} -l app.kubernetes.io/name=falco-airgapped --tail=20 || true
+                    """
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "========================================="
+            echo "Deployment completed successfully!"
+            echo "========================================="
+            echo "Environment: ${params.DEPLOYMENT_ENV}"
+            echo "Namespace: ${K8S_NAMESPACE}"
+            echo "Release: ${HELM_RELEASE}"
+            echo "========================================="
+        }
+        
+        failure {
+            echo "========================================="
+            echo "Deployment failed!"
+            echo "========================================="
+            echo "Check the logs above for error details"
+        }
+        
+        always {
+            // Clean up Docker images to save space
+            sh 'docker system prune -f || true'
+        }
+    }
+}

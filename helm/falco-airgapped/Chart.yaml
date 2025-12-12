@@ -1,0 +1,19 @@
+apiVersion: v2
+name: falco-airgapped
+description: Falco Security for air-gapped Kubernetes environments with custom plugin loading
+type: application
+version: 1.0.0
+appVersion: "0.41.0"
+keywords:
+  - security
+  - monitoring
+  - runtime-security
+  - falco
+  - air-gapped
+home: https://github.com/your-org/falco-airgapped-deployment
+sources:
+  - https://github.com/falcosecurity/falco
+maintainers:
+  - name: Your Team
+    email: your-team@company.com
+icon: https://falco.org/img/brand/falco-logo.png

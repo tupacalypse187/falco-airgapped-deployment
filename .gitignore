@@ -1,0 +1,26 @@
+# Plugin artifacts (generated during build)
+plugins/extracted/*.so
+plugins/source/*
+
+# Temporary files
+*.tmp
+*.log
+*.tar.gz
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.pyc
+__pycache__/
+
+# Kubernetes secrets
+*-secret.yaml
+secrets/

@@ -1,0 +1,286 @@
+# Default values for falco-airgapped
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Plugin loading strategy: "sidecar" or "s3"
+pluginLoadingStrategy: "sidecar"
+
+# Image configuration
+image:
+  # For sidecar strategy, use base image
+  # For S3 strategy, use s3-loader image
+  registry: "your-private-registry.com"
+  repository: "falcosecurity/falco"
+  tag: "0.41.0-almalinux9"
+  pullPolicy: IfNotPresent
+  # Uncomment for S3 strategy
+  # tag: "0.41.0-s3-almalinux9"
+
+imagePullSecrets: []
+# - name: private-registry-secret
+
+# Plugin loader sidecar configuration (used when pluginLoadingStrategy: "sidecar")
+pluginLoader:
+  enabled: true
+  image:
+    registry: "your-private-registry.com"
+    repository: "falcosecurity/falco-plugin-loader"
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# S3 plugin loader configuration (used when pluginLoadingStrategy: "s3")
+s3PluginLoader:
+  enabled: false
+  # S3 bucket containing plugin .so files
+  bucket: ""
+  # S3 prefix/folder path
+  prefix: "falco-plugins/"
+  # AWS region
+  region: "us-east-1"
+  # Required plugins (space-separated list)
+  requiredPlugins: "k8saudit-eks-0.10.0.so container-0.4.1.so"
+  # Download timeout in seconds
+  timeout: 300
+  # Fail if plugin download fails
+  failOnError: true
+  # IAM role for S3 access (if using IRSA)
+  serviceAccount:
+    annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/falco-s3-access
+
+# Falco configuration
+falco:
+  # Falco configuration file
+  config:
+    # Rules files to load
+    rulesFiles:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/rules.d
+    
+    # Plugins configuration
+    plugins:
+      - name: k8saudit-eks
+        library_path: /usr/share/falco/plugins/k8saudit-eks-0.10.0.so
+        init_config: ""
+        open_params: ""
+      - name: container
+        library_path: /usr/share/falco/plugins/container-0.4.1.so
+        init_config: ""
+    
+    # Load plugins (empty by default, configure as needed)
+    loadPlugins: []
+    
+    # Logging
+    logStderr: true
+    logSyslog: false
+    logLevel: info
+    
+    # Output channels
+    stdoutOutput:
+      enabled: true
+    
+    fileOutput:
+      enabled: true
+      keepAlive: false
+      filename: /var/log/falco/events.log
+    
+    httpOutput:
+      enabled: false
+      url: ""
+    
+    # gRPC configuration
+    grpc:
+      enabled: false
+      bindAddress: "0.0.0.0:5060"
+      threadiness: 0
+    
+    grpcOutput:
+      enabled: false
+    
+    # Metrics
+    metrics:
+      enabled: true
+      interval: 1h
+      outputRule: true
+      resourceUtilizationEnabled: true
+      stateCountersEnabled: true
+      kernelEventCountersEnabled: true
+      libbpfStatsEnabled: true
+    
+    # Webserver for metrics and health checks
+    webserver:
+      enabled: true
+      listenPort: 8765
+      k8sHealthzEndpoint: /healthz
+      sslEnabled: false
+    
+    # Engine configuration
+    engine:
+      kind: modern_bpf
+      modernBpf:
+        cpusForEachSyscallBuffer: 2
+
+# Driver configuration
+driver:
+  enabled: true
+  kind: modern_bpf  # Options: module, ebpf, modern_bpf
+  
+  # Driver loader (for module and ebpf kinds)
+  loader:
+    enabled: false
+    initContainer:
+      enabled: false
+      image:
+        registry: "your-private-registry.com"
+        repository: "falcosecurity/falco-driver-loader"
+        tag: "0.41.0"
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+# DaemonSet configuration
+daemonset:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  
+  # Pod annotations
+  podAnnotations: {}
+  
+  # Pod labels
+  podLabels: {}
+  
+  # Priority class
+  priorityClassName: ""
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+  
+  # Affinity
+  affinity: {}
+  
+  # Host networking
+  hostNetwork: true
+  hostPID: true
+  
+  # Security context
+  podSecurityContext:
+    runAsNonRoot: false
+    runAsUser: 0
+  
+  containerSecurityContext:
+    privileged: true
+    capabilities:
+      add:
+        - SYS_ADMIN
+        - SYS_RESOURCE
+        - SYS_PTRACE
+    readOnlyRootFilesystem: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  ports:
+    grpc: 5060
+    metrics: 8765
+  annotations: {}
+
+# ServiceAccount configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# RBAC configuration
+rbac:
+  create: true
+
+# Resources
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Liveness probe
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 8765
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /healthz
+    port: 8765
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Custom rules
+customRules: {}
+  # custom-rules.yaml: |-
+  #   - rule: Custom Rule
+  #     desc: Description
+  #     condition: evt.type=open
+  #     output: Custom output
+  #     priority: WARNING
+
+# Extra volumes
+extraVolumes: []
+  # - name: custom-volume
+  #   configMap:
+  #     name: custom-config
+
+# Extra volume mounts
+extraVolumeMounts: []
+  # - name: custom-volume
+  #   mountPath: /custom/path
+
+# Extra environment variables
+extraEnv: []
+  # - name: CUSTOM_VAR
+  #   value: "custom-value"
+
+# ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+# Pod Monitor for Prometheus Operator
+podMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
