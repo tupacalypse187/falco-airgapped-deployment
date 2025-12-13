@@ -8,7 +8,7 @@ set -e
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCAL_REGISTRY="localhost:5000"
-FALCO_VERSION="0.41.0"
+FALCO_VERSION="0.42.1"
 PLUGIN_LOADER_VERSION="1.0.0"
 
 # Colors
@@ -205,6 +205,50 @@ build_plugin_loader() {
     log_info "  ✓ Plugin loader image built and pushed"
 }
 
+# Prepare Falcosidekick images
+prepare_sidekick_images() {
+    log_step "Preparing Falcosidekick images..."
+    
+    SIDEKICK_VERSION="2.28.0"
+    SIDEKICK_UI_VERSION="2.2.0"
+    
+    # helper for pull/tag/push
+    process_image() {
+        local name=$1
+        local version=$2
+        local source_image="falcosecurity/$name:$version"
+        local target_image="${LOCAL_REGISTRY}/falcosecurity/$name:$version"
+        
+        log_info "  Processing $source_image..."
+        docker pull "$source_image"
+        docker tag "$source_image" "$target_image"
+        docker push "$target_image"
+        log_info "  ✓ Pushed $target_image"
+    }
+    
+    process_image "falcosidekick" "$SIDEKICK_VERSION"
+    process_image "falcosidekick-ui" "$SIDEKICK_UI_VERSION"
+    
+    # Redis for Sidekick UI
+    log_info "  Processing redis:alpine..."
+    docker pull "redis:alpine"
+    docker tag "redis:alpine" "${LOCAL_REGISTRY}/redis:alpine"
+    docker push "${LOCAL_REGISTRY}/redis:alpine"
+    
+    log_info "  ✓ Falcosidekick images prepared"
+}
+
+# Update Helm chart dependencies
+update_chart_deps() {
+    log_step "Updating Helm chart dependencies..."
+    
+    if ! helm dependency update "${PROJECT_ROOT}/helm/falco-airgapped"; then
+        log_error "Failed to update Helm dependencies"
+        exit 1
+    fi
+    log_info "  ✓ Helm dependencies updated"
+}
+
 # Main function
 main() {
     log_info "========================================="
@@ -253,6 +297,10 @@ main() {
         6)
             extract_plugins
             echo ""
+            update_chart_deps
+            echo ""
+            prepare_sidekick_images
+            echo ""
             build_falco_base
             echo ""
             build_falco_s3
@@ -271,9 +319,9 @@ main() {
     log_info "========================================="
     log_info ""
     log_info "Next steps:"
-    log_info "  1. Start Minikube: minikube start"
+    log_info "  1. Start Minikube: minikube start -p falcosecurity"
     log_info "  2. Configure Minikube to use local registry:"
-    log_info "     minikube addons enable registry"
+    log_info "     minikube addons enable registry -p falcosecurity"
     log_info "  3. Deploy Falco: bash scripts/local/deploy-minikube.sh"
 }
 

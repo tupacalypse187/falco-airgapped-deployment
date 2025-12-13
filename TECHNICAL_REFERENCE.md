@@ -53,9 +53,24 @@ This document provides detailed technical information about the Falco air-gapped
 
 **Volume Mount**: Expects target directory at `/usr/share/falco/plugins` (configurable via `FALCO_PLUGINS_DIR`)
 
+### Falcosidekick Images
+
+**Images**:
+- `falcosecurity/falcosidekick:2.28.0`: Forwards events
+- `falcosecurity/falcosidekick-ui:2.2.0`: Web Dashboard
+- `redis:alpine`: Backend for UI
+
+**Air-Gapped Handling**:
+These images are pulled during the "Full Build" phase and pushed to the local registry to ensure 100% offline compatibility during deployment.
+
 ## Falco Plugins
 
-### k8saudit-eks Plugin
+### k8saudit Plugin (Local/Generic)
+**Version**: 0.10.0
+**Event Source**: `k8s_audit`
+**Purpose**: Generic Kubernetes audit log support (used for Minikube/local testing)
+
+### k8saudit-eks Plugin (AWS)
 
 **Version**: 0.10.0
 
@@ -142,6 +157,21 @@ resources:
   limits:
     cpu: 1000m
     memory: 1Gi
+```
+
+**Falcosidekick Configuration**:
+```yaml
+falcosidekick:
+  enabled: true
+  image:
+    registry: "localhost:5000"
+  webui:
+    enabled: true
+    image:
+      registry: "localhost:5000"
+  redis:
+    image:
+      registry: "localhost:5000"
 ```
 
 ### Kubernetes Resources Created

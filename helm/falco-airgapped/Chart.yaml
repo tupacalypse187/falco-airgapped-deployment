@@ -17,3 +17,8 @@ maintainers:
   - name: Your Team
     email: your-team@company.com
 icon: https://falco.org/img/brand/falco-logo.png
+dependencies:
+  - name: falcosidekick
+    version: "0.7.17"
+    repository: "https://falcosecurity.github.io/charts"
+    condition: falcosidekick.enabled

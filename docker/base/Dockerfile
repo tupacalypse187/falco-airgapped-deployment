@@ -6,7 +6,7 @@ LABEL description="Falco Security - Air-gapped deployment on AlmaLinux 9"
 LABEL version="0.41.0"
 
 # Build arguments
-ARG FALCO_VERSION=0.41.0
+ARG FALCO_VERSION=0.42.1
 ARG FALCOCTL_VERSION=0.11.1
 
 # Environment variables
@@ -18,7 +18,7 @@ ENV FALCO_PLUGINS_DIR=/usr/share/falco/plugins
 ENV FALCO_RULES_DIR=/etc/falco/rules.d
 
 # Install system dependencies
-RUN dnf install -y \
+RUN dnf install -y --allowerasing \
     ca-certificates \
     curl \
     gnupg \
@@ -34,7 +34,8 @@ RUN mkdir -p \
     ${FALCO_CONFIG_DIR} \
     ${FALCO_PLUGINS_DIR} \
     ${FALCO_RULES_DIR} \
-    /var/log/falco
+    /var/log/falco \
+    /var/run/secrets/kubernetes.io/serviceaccount
 
 # Download and install Falco
 # In air-gapped environment, you would copy these from a local source

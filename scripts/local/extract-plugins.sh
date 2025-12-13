@@ -10,9 +10,17 @@ EXTRACTED_DIR="${PLUGINS_DIR}/extracted"
 SOURCE_DIR="${PLUGINS_DIR}/source"
 
 # Plugin versions to extract
-declare -A PLUGINS=(
-    ["k8saudit-eks"]="0.10.0"
-    ["container"]="0.4.1"
+# Plugin names and versions (using parallel arrays for Bash 3.2 compatibility)
+PLUGIN_NAMES=(
+    "k8saudit-eks"
+    "k8saudit"
+    "container"
+)
+
+PLUGIN_VERSIONS=(
+    "0.10.0"
+    "0.10.0"
+    "0.4.1"
 )
 
 # Colors for output
@@ -39,121 +47,35 @@ mkdir -p "${EXTRACTED_DIR}" "${SOURCE_DIR}"
 log_info "Starting Falco plugin extraction process..."
 log_info "Extracted plugins will be saved to: ${EXTRACTED_DIR}"
 
-for plugin_name in "${!PLUGINS[@]}"; do
-    version="${PLUGINS[$plugin_name]}"
-    image="ghcr.io/falcosecurity/plugins/plugin/${plugin_name}:${version}"
-    container_name="falco-plugin-extract-${plugin_name}"
-    
+for i in "${!PLUGIN_NAMES[@]}"; do
+    plugin_name="${PLUGIN_NAMES[$i]}"
+    version="${PLUGIN_VERSIONS[$i]}"
     log_info "Processing plugin: ${plugin_name} (version ${version})"
+
+    # Use falcosecurity/falcoctl Docker image to download the plugin
+    # This avoids "unsupported media type" errors on some Docker versions/platforms
+    # because falcoctl handles OCI artifacts correctly.
+    log_info "  Downloading plugin using falcoctl (Docker)..."
     
-    # Pull the plugin container
-    log_info "  Pulling container: ${image}"
-    if docker pull "${image}"; then
-        log_info "  Successfully pulled ${image}"
-    else
-        log_error "  Failed to pull ${image}"
+    if ! docker run --rm \
+        --user root \
+        -v "${EXTRACTED_DIR}:/plugins" \
+        falcosecurity/falcoctl:0.11.0 \
+        artifact install "ghcr.io/falcosecurity/plugins/plugin/${plugin_name}:${version}" --plugins-dir /plugins; then
+        
+        log_error "  Failed to download plugin ${plugin_name}"
+        log_error "  Please check internet connection or plugin version"
         continue
     fi
     
-    # Create container without running it
-    log_info "  Creating container for extraction..."
-    if docker create --name "${container_name}" "${image}" >/dev/null 2>&1; then
-        log_info "  Container created: ${container_name}"
-    else
-        log_warn "  Container ${container_name} may already exist, removing..."
-        docker rm "${container_name}" >/dev/null 2>&1 || true
-        docker create --name "${container_name}" "${image}" >/dev/null 2>&1
+    # Rename standard lib name to versioned name expected by build/config
+    # e.g. libk8saudit-eks.so -> k8saudit-eks-0.10.0.so
+    if [ -f "${EXTRACTED_DIR}/lib${plugin_name}.so" ]; then
+        mv "${EXTRACTED_DIR}/lib${plugin_name}.so" "${EXTRACTED_DIR}/${plugin_name}-${version}.so"
+        log_info "  Renamed lib${plugin_name}.so -> ${plugin_name}-${version}.so"
     fi
     
-    # Try to find and extract plugin files
-    log_info "  Searching for plugin files in container..."
-    
-    # Common plugin locations in Falco plugin containers
-    plugin_paths=(
-        "/plugins"
-        "/usr/share/falco/plugins"
-        "/lib"
-        "/"
-    )
-    
-    extracted=false
-    for path in "${plugin_paths[@]}"; do
-        log_info "    Checking path: ${path}"
-        
-        # Try to copy the entire directory first
-        if docker cp "${container_name}:${path}" "${SOURCE_DIR}/${plugin_name}-temp" 2>/dev/null; then
-            log_info "    Found files in ${path}"
-            
-            # Search for .so files
-            find "${SOURCE_DIR}/${plugin_name}-temp" -name "*.so" -type f | while read -r so_file; do
-                filename=$(basename "${so_file}")
-                cp "${so_file}" "${EXTRACTED_DIR}/${plugin_name}-${version}.so"
-                log_info "    Extracted: ${filename} -> ${plugin_name}-${version}.so"
-                extracted=true
-            done
-            
-            # Also copy any config files
-            find "${SOURCE_DIR}/${plugin_name}-temp" -name "*.yaml" -o -name "*.json" | while read -r config_file; do
-                filename=$(basename "${config_file}")
-                cp "${config_file}" "${EXTRACTED_DIR}/${plugin_name}-${version}-${filename}"
-                log_info "    Extracted config: ${filename}"
-            done
-            
-            # Clean up temp directory
-            rm -rf "${SOURCE_DIR}/${plugin_name}-temp"
-            break
-        fi
-    done
-    
-    # If no .so file found, try direct file copy
-    if [ ! -f "${EXTRACTED_DIR}/${plugin_name}-${version}.so" ]; then
-        log_info "    Attempting direct .so file extraction..."
-        for path in "${plugin_paths[@]}"; do
-            if docker cp "${container_name}:${path}/lib${plugin_name}.so" "${EXTRACTED_DIR}/${plugin_name}-${version}.so" 2>/dev/null; then
-                log_info "    Successfully extracted lib${plugin_name}.so"
-                extracted=true
-                break
-            fi
-            if docker cp "${container_name}:${path}/${plugin_name}.so" "${EXTRACTED_DIR}/${plugin_name}-${version}.so" 2>/dev/null; then
-                log_info "    Successfully extracted ${plugin_name}.so"
-                extracted=true
-                break
-            fi
-        done
-    else
-        extracted=true
-    fi
-    
-    # Export the container filesystem as a tarball for manual inspection if needed
-    log_info "  Exporting container filesystem for reference..."
-    docker export "${container_name}" > "${SOURCE_DIR}/${plugin_name}-${version}-filesystem.tar"
-    log_info "  Container filesystem exported to: ${SOURCE_DIR}/${plugin_name}-${version}-filesystem.tar"
-    
-    # Extract the tarball to inspect structure
-    mkdir -p "${SOURCE_DIR}/${plugin_name}-${version}-fs"
-    tar -xf "${SOURCE_DIR}/${plugin_name}-${version}-filesystem.tar" -C "${SOURCE_DIR}/${plugin_name}-${version}-fs"
-    
-    # Search for .so files in the extracted filesystem
-    log_info "  Searching extracted filesystem for .so files..."
-    find "${SOURCE_DIR}/${plugin_name}-${version}-fs" -name "*.so" -type f | while read -r so_file; do
-        filename=$(basename "${so_file}")
-        relative_path="${so_file#${SOURCE_DIR}/${plugin_name}-${version}-fs}"
-        cp "${so_file}" "${EXTRACTED_DIR}/${plugin_name}-${version}.so"
-        log_info "    Found and extracted: ${relative_path} -> ${plugin_name}-${version}.so"
-        extracted=true
-    done
-    
-    # Clean up container
-    log_info "  Cleaning up container..."
-    docker rm "${container_name}" >/dev/null 2>&1
-    
-    if [ "$extracted" = true ] || [ -f "${EXTRACTED_DIR}/${plugin_name}-${version}.so" ]; then
-        log_info "  ✓ Plugin ${plugin_name} extraction completed"
-    else
-        log_error "  ✗ Failed to extract plugin ${plugin_name}"
-        log_warn "  Manual inspection required. Check: ${SOURCE_DIR}/${plugin_name}-${version}-fs"
-    fi
-    
+    log_info "  ✓ Plugin ${plugin_name} downloaded successfully"
     echo ""
 done
 

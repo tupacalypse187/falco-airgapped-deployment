@@ -25,7 +25,7 @@ ENV AWS_REGION="us-east-1"
 ENV PLUGIN_DOWNLOAD_TIMEOUT=300
 
 # Install system dependencies including AWS CLI
-RUN dnf install -y \
+RUN dnf install -y --allowerasing \
     ca-certificates \
     curl \
     gnupg \
@@ -53,6 +53,7 @@ RUN mkdir -p \
     ${FALCO_PLUGINS_DIR} \
     ${FALCO_RULES_DIR} \
     /var/log/falco \
+    /var/run/secrets/kubernetes.io/serviceaccount \
     /tmp/plugins
 
 # Download and install Falco
