@@ -6,7 +6,7 @@ LABEL description="Falco Plugin Loader - Sidecar for air-gapped plugin deploymen
 LABEL version="1.0.0"
 
 # Install minimal dependencies
-RUN dnf install -y \
+RUN dnf install -y --allowerasing \
     ca-certificates \
     curl \
     && dnf clean all \

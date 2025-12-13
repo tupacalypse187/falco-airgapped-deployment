@@ -44,22 +44,25 @@ This project includes a script to automate the process of extracting the Falco p
     - Pull the official Falco plugin containers from `ghcr.io`.
     - Extract the `.so` plugin files and place them in the `plugins/extracted` directory.
     - Build the following container images and push them to your local registry:
-      - `localhost:5000/falcosecurity/falco:0.41.0-almalinux9` (the base Falco image)
-      - `localhost:5000/falcosecurity/falco:0.41.0-s3-almalinux9` (the Falco image with S3 support)
-      - `localhost:5000/falcosecurity/falco-plugin-loader:1.0.0` (the sidecar image)
+      - `localhost:5000/falcosecurity/falco:0.42.1-almalinux9` (Base)
+      - `localhost:5000/falcosecurity/falco:0.42.1-s3-almalinux9` (S3 Loader)
+      - `localhost:5000/falcosecurity/falco-plugin-loader:1.0.0` (Plugin Loader)
+      - `localhost:5000/falcosecurity/falcosidekick:2.28.0` (Sidekick)
+      - `localhost:5000/falcosecurity/falcosidekick-ui:2.2.0` (Sidekick UI)
+      - `localhost:5000/redis:alpine` (Redis for UI)
 
 ## Step 3: Start and Configure Minikube
 
 1.  Start Minikube:
 
     ```bash
-    minikube start --driver=docker --cpus=4 --memory=8192
+    minikube start -p falcosecurity --driver=docker --cpus=4 --memory=8192
     ```
 
 2.  Enable the registry addon in Minikube. This will allow Minikube to pull images from your local registry.
 
     ```bash
-    minikube addons enable registry
+    minikube addons enable registry -p falcosecurity
     ```
 
 ## Step 4: Deploy Falco to Minikube
@@ -78,11 +81,12 @@ Now that you have your images built and Minikube running, you can deploy Falco.
     bash deploy-minikube.sh
     ```
 
-3.  The script will prompt you to choose a plugin loading strategy:
-    - **Sidecar**: This will deploy Falco with an init container that provides the plugins.
-    - **S3**: This option is for the production environment and requires an S3 bucket. For local testing, choose the `sidecar` option.
+3.  The script will prompt you for configuration:
+    - **Plugin Loading Strategy**: Choose `1` (Sidecar) for local testing.
+    - **Falcosidekick UI**: Choose `1` (Yes) to enable the Web UI dashboard.
+    - **Load Images**: Choose `1` (Yes) if this is your first deploy or if you rebuilt images.
 
-4.  The script will then deploy Falco to your Minikube cluster using the Helm chart in this project.
+4.  The script will then deploy Falco (and Sidekick components if enabled) to your Minikube cluster using the Helm chart.
 
 ## Step 5: Verify the Deployment
 
@@ -104,15 +108,28 @@ Once the deployment is complete, the script will display the status of the Falco
 
     You should see Falco's output, including any security events it detects.
 
+3.  Access the Falcosidekick UI (if enabled):
+
+    ```bash
+    kubectl port-forward -n falco svc/falco-falcosidekick-ui 2802:2802
+    ```
+
+    Open your browser to [http://localhost:2802](http://localhost:2802).
+    Default credentials: `admin` / `admin`.
+
 ## Cleaning Up
 
-To remove the Falco deployment from Minikube:
+    helm uninstall falco -n falco
+    # Verify resources are gone
+    kubectl get all -n falco
+    # Or delete the minikube profile entirely
+    minikube delete -p falcosecurity
 
 ```bash
 helm uninstall falco -n falco
 ```
 
-To stop Minikube:
+    minikube stop -p falcosecurity
 
 ```bash
 minikube stop

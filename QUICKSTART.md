@@ -24,20 +24,23 @@ bash build-local.sh
 
 **Step 2: Start Minikube**
 ```bash
-minikube start --driver=docker --cpus=4 --memory=8192
-minikube addons enable registry
+minikube start -p falcosecurity --driver=docker --cpus=4 --memory=8192
+minikube addons enable registry -p falcosecurity
 ```
 
 **Step 3: Deploy Falco**
 ```bash
 bash deploy-minikube.sh
-# Select option 1 for sidecar strategy
+# Select option 1 (Sidecar)
+# Select option 1 (Enable UI)
+# Select option 1 (Load Images)
 ```
 
 ### Verify Deployment
 ```bash
 kubectl get pods -n falco
-kubectl logs -n falco -l app.kubernetes.io/name=falco-airgapped -f
+# Access UI
+kubectl port-forward -n falco svc/falco-falcosidekick-ui 2802:2802
 ```
 
 ## For AWS EKS Production
@@ -81,7 +84,7 @@ kubectl logs -n falco-dev -l app.kubernetes.io/name=falco-airgapped -f
 **Solution**: Ensure Docker is running and you have internet access
 
 **Issue**: Minikube pods not starting
-**Solution**: Check Minikube resources: `minikube config set memory 8192`
+**Solution**: Check Minikube resources: `minikube config set -p falcosecurity memory 8192`
 
 **Issue**: EKS deployment fails
 **Solution**: Verify AWS credentials: `aws sts get-caller-identity`

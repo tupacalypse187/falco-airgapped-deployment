@@ -8,7 +8,7 @@ metadata:
 data:
   falco.yaml: |-
     # Falco configuration
-    rules_file:
+    rules_files:
     {{- range .Values.falco.config.rulesFiles }}
       - {{ . }}
     {{- end }}
@@ -31,9 +31,11 @@ data:
     {{- end }}
     
     # Load plugins
+    {{- if .Values.falco.config.loadPlugins }}
     load_plugins:
     {{- range .Values.falco.config.loadPlugins }}
       - {{ . }}
+    {{- end }}
     {{- end }}
     
     # Watch config file for changes
@@ -101,9 +103,7 @@ data:
     
     # Output formatting
     output_timeout: 2000
-    outputs:
-      rate: 1
-      max_burst: 1000
+    # outputs: rate/burst removed as deprecated/invalid
     
     # Priority level for rules
     priority: debug
@@ -112,7 +112,7 @@ data:
     buffered_outputs: false
     
     # Syscall buffer size
-    syscall_buf_size_preset: 4
+    # syscall_buf_size_preset: 4 (removed as invalid/deprecated)
     
     # Base syscalls
     base_syscalls:
@@ -128,9 +128,11 @@ data:
       {{- end }}
       kmod:
         buf_size_preset: 4
+      {{- if eq .Values.falco.config.engine.kind "ebpf" }}
       ebpf:
         buf_size_preset: 4
         drop_failed_exit: false
+      {{- end }}
 
 {{- if .Values.customRules }}
 ---

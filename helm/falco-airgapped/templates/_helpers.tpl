@@ -105,7 +105,7 @@ Return the proper driver loader image name
 Check if sidecar plugin loading is enabled
 */}}
 {{- define "falco-airgapped.useSidecarPluginLoader" -}}
-{{- if and .Values.pluginLoader.enabled (eq .Values.pluginLoadingStrategy "sidecar") }}
+{{- if eq .Values.pluginLoadingStrategy "sidecar" }}
 true
 {{- else }}
 false

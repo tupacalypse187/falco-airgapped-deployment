@@ -7,6 +7,7 @@ set -e
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LOCAL_REGISTRY="localhost:5000"
+FALCO_VERSION="0.42.1"
 NAMESPACE="falco"
 RELEASE_NAME="falco"
 PLUGIN_STRATEGY="sidecar"  # Options: sidecar, s3
@@ -60,13 +61,13 @@ check_prerequisites() {
 check_minikube() {
     log_step "Checking Minikube status..."
     
-    if ! minikube status &> /dev/null; then
+    if ! minikube status -p falcosecurity &> /dev/null; then
         log_warn "  Minikube is not running"
         read -p "Start Minikube now? (y/n): " start_minikube
         
         if [ "$start_minikube" = "y" ]; then
             log_info "  Starting Minikube..."
-            minikube start --driver=docker --cpus=4 --memory=8192
+            minikube start -p falcosecurity --driver=docker --cpus=4 --memory=8192
         else
             log_error "  Please start Minikube first: minikube start"
             exit 1
@@ -74,7 +75,7 @@ check_minikube() {
     fi
     
     log_info "  ✓ Minikube is running"
-    minikube status
+    minikube status -p falcosecurity
 }
 
 # Configure registry access
@@ -85,11 +86,11 @@ configure_registry() {
     log_info "  Configuring Minikube to access local registry..."
     
     # Check if registry addon is enabled
-    if minikube addons list | grep -q "registry.*enabled"; then
+    if minikube addons list -p falcosecurity | grep -q "registry.*enabled"; then
         log_info "  ✓ Registry addon is already enabled"
     else
         log_info "  Enabling registry addon..."
-        minikube addons enable registry
+        minikube addons enable registry -p falcosecurity
     fi
     
     # Create port forward to local registry (if needed)
@@ -145,8 +146,43 @@ deploy_falco() {
             exit 1
             ;;
     esac
+
+    # Ask if user wants to enable Falcosidekick UI
+    echo ""
+    echo "Do you want to enable Falcosidekick UI? (Requires Redis/UI images)"
+    echo "  1) Yes"
+    echo "  2) No"
+    read -p "Enter choice [1-2]: " sidekick_choice
+    
+    ENABLE_SIDEKICK="false"
+    if [ "$sidekick_choice" = "1" ]; then
+        ENABLE_SIDEKICK="true"
+    fi
     
     log_info "  Plugin loading strategy: ${PLUGIN_STRATEGY}"
+
+    # Ask if user wants to load images (optional)
+    echo ""
+    echo "Do you want to load images into Minikube? (Recommended for first deploy or after rebuild)"
+    echo "  1) Yes"
+    echo "  2) No"
+    read -p "Enter choice [1-2]: " load_images_choice
+    
+    if [ "$load_images_choice" = "1" ]; then
+        log_info "  Loading images into Minikube..."
+        minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falco:${FALCO_VERSION}-almalinux9"
+        minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falco-plugin-loader:1.0.0"
+        
+        if [ "$ENABLE_SIDEKICK" = "true" ]; then
+            log_info "  Loading Sidekick images..."
+            minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falcosidekick:2.28.0"
+            minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falcosidekick-ui:2.2.0"
+            minikube -p falcosecurity image load "${LOCAL_REGISTRY}/redis:alpine"
+        fi
+        log_info "  ✓ Images loaded into Minikube"
+    else
+        log_info "  Skipping image loading"
+    fi
     
     # Prepare Helm values
     cat > /tmp/falco-local-values.yaml <<EOF
@@ -154,8 +190,43 @@ deploy_falco() {
 image:
   registry: "${LOCAL_REGISTRY}"
   repository: "falcosecurity/falco"
-  tag: "0.41.0-almalinux9"
+  tag: "${FALCO_VERSION}-almalinux9"
   pullPolicy: IfNotPresent
+
+falco:
+  config:
+    engine:
+      kind: modern_ebpf
+
+    plugins:
+      - name: k8saudit
+        library_path: /usr/share/falco/plugins/k8saudit-0.10.0.so
+        init_config: ""
+        open_params: "http://0.0.0.0:9765/k8s-audit"
+      - name: container
+        library_path: /usr/share/falco/plugins/container-0.4.1.so
+        init_config: ""
+        open_params: ""
+    
+    http_output:
+      enabled: ${ENABLE_SIDEKICK}
+      url: "http://${RELEASE_NAME}-falcosidekick:2801/"
+
+falcosidekick:
+  enabled: ${ENABLE_SIDEKICK}
+  webui:
+    enabled: ${ENABLE_SIDEKICK}
+    service:
+      type: ClusterIP
+
+  # Configure Redis to use local air-gapped image
+  redis:
+    enabled: true
+    image:
+      registry: "${LOCAL_REGISTRY}"
+      repository: "redis"
+      tag: "alpine"
+      pullPolicy: IfNotPresent
 
 pluginLoadingStrategy: "${PLUGIN_STRATEGY}"
 
@@ -179,7 +250,7 @@ fi)
 
 driver:
   enabled: true
-  kind: modern_bpf
+  kind: modern_ebpf
   loader:
     enabled: false
 
@@ -268,6 +339,13 @@ show_access_commands() {
     log_info "  kubectl port-forward -n ${NAMESPACE} daemonset/falco 8765:8765"
     log_info "  Then access: http://localhost:8765/metrics"
     log_info ""
+    if [ "$ENABLE_SIDEKICK" = "true" ]; then
+        log_info "Port forward to Falcosidekick UI:"
+        log_info "  kubectl port-forward -n ${NAMESPACE} svc/${RELEASE_NAME}-falcosidekick-ui 2802:2802"
+        log_info "  Then access: http://localhost:2802"
+        log_info "  (Default credentials: admin / admin)"
+        log_info ""
+    fi
     log_info "Uninstall:"
     log_info "  helm uninstall ${RELEASE_NAME} -n ${NAMESPACE}"
     log_info ""

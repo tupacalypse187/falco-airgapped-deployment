@@ -29,6 +29,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "falco-airgapped.serviceAccountName" . }}
+      automountServiceAccountToken: false
       hostNetwork: {{ .Values.daemonset.hostNetwork }}
       hostPID: {{ .Values.daemonset.hostPID }}
       {{- if .Values.daemonset.priorityClassName }}
@@ -52,7 +53,7 @@ spec:
       {{- end }}
       
       initContainers:
-      {{- if eq (include "falco-airgapped.useSidecarPluginLoader" .) "true" }}
+      {{- if eq .Values.pluginLoadingStrategy "sidecar" }}
       # Plugin loader init container (sidecar strategy)
       - name: plugin-loader
         image: {{ include "falco-airgapped.pluginLoaderImage" . }}
@@ -81,6 +82,10 @@ spec:
         env:
           - name: DRIVER_REPO
             value: {{ .Values.driver.loader.driverRepo | default "https://download.falco.org/driver" | quote }}
+          - name: FALCO_DRIVER_CHOICE
+            value: {{ .Values.driver.kind }}
+          - name: FALCOCTL_DRIVER_TYPE
+            value: {{ .Values.driver.kind }}
         volumeMounts:
           - name: host-root
             mountPath: /host
@@ -103,15 +108,12 @@ spec:
         {{- end }}
         args:
           - /usr/bin/falco
-          - --cri
-          - /run/containerd/containerd.sock
-          - --cri
-          - /run/crio/crio.sock
-          - -K
-          - /var/run/secrets/kubernetes.io/serviceaccount/token
-          - -k
-          - https://$(KUBERNETES_SERVICE_HOST)
-          - -pk
+          - -r
+          - /etc/falco/falco_rules.yaml
+          - -r
+          - /etc/falco/falco_rules.local.yaml
+          - -r
+          - /etc/falco/rules.d
         env:
           - name: FALCO_BPF_PROBE
             value: ""
@@ -136,7 +138,8 @@ spec:
         
         {{- if .Values.livenessProbe.enabled }}
         livenessProbe:
-          {{- toYaml .Values.livenessProbe.httpGet | nindent 10 }}
+          httpGet:
+            {{- toYaml .Values.livenessProbe.httpGet | nindent 12 }}
           initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
@@ -145,7 +148,8 @@ spec:
         
         {{- if .Values.readinessProbe.enabled }}
         readinessProbe:
-          {{- toYaml .Values.readinessProbe.httpGet | nindent 10 }}
+          httpGet:
+            {{- toYaml .Values.readinessProbe.httpGet | nindent 12 }}
           initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
@@ -159,8 +163,9 @@ spec:
         
         volumeMounts:
           - name: config
-            mountPath: /etc/falco
-          {{- if eq (include "falco-airgapped.useSidecarPluginLoader" .) "true" }}
+            mountPath: /etc/falco/falco.yaml
+            subPath: falco.yaml
+          {{- if eq .Values.pluginLoadingStrategy "sidecar" }}
           - name: plugins-volume
             mountPath: /usr/share/falco/plugins
             readOnly: true
@@ -193,7 +198,7 @@ spec:
         - name: config
           configMap:
             name: {{ include "falco-airgapped.fullname" . }}
-        {{- if eq (include "falco-airgapped.useSidecarPluginLoader" .) "true" }}
+        {{- if eq .Values.pluginLoadingStrategy "sidecar" }}
         - name: plugins-volume
           emptyDir: {}
         {{- end }}

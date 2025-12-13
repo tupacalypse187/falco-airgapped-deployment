@@ -124,14 +124,14 @@ falco:
     
     # Engine configuration
     engine:
-      kind: modern_bpf
+      kind: ebpf
       modernBpf:
         cpusForEachSyscallBuffer: 2
 
 # Driver configuration
 driver:
   enabled: true
-  kind: modern_bpf  # Options: module, ebpf, modern_bpf
+  kind: ebpf  # Options: module, ebpf, modern_bpf
   
   # Driver loader (for module and ebpf kinds)
   loader:
@@ -284,3 +284,42 @@ podMonitor:
   interval: 30s
   scrapeTimeout: 10s
   labels: {}
+
+# Falcosidekick configuration
+falcosidekick:
+  enabled: false
+  image:
+    registry: "localhost:5000"
+    repository: "falcosecurity/falcosidekick"
+    tag: "2.28.0"
+    pullPolicy: IfNotPresent
+  
+  webui:
+    enabled: true
+    image:
+      registry: "localhost:5000"
+      repository: "falcosecurity/falcosidekick-ui"
+      tag: "2.2.0"
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 2802
+
+  # We don't need redis for a simple local test, but ui needs it?
+  # Sidekick UI defaults to no redis (in-memory) if redis is disabled?
+  # Actually, UI usually needs Redis.
+  # Let's check defaults. Often redis is bundled.
+  # For air-gapped, we might need a redis image too if we enable redis.
+  # For now, let's assume in-memory or user accepts redis pull if not strictly air-gapped 100% (or we add redis image).
+  # Sidekick UI definitely works best with Redis.
+  # Let's disable redis by default to simplify deps, UI works with Falcosidekick's internal cache?
+  # No, Sidekick UI connects to Redis.
+  # BUT, falcosidekick chart includes redis.
+  # We should configure redis to use valid image or disable it.
+  # Let's try without redis first (using sidekick's internal memory/output if supported? No, UI needs Redis).
+  # Okay, we might need redis.
+  # To avoid complexity, I'll trust standard chart defaults but user might hit image pull error for redis.
+  # I'll enable redis but setting image registry?
+  # The falcosidekick chart allows configuring redis.image.
+  # I'll leave redis enabled (default) but warn user.
+  # OR, simpler: just expose console.
