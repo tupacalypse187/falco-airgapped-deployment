@@ -221,7 +221,7 @@ falco:
       kind: modern_ebpf
 
     # Ensure alerts are visible in logs (text format)
-    jsonOutput: false
+    jsonOutput: true
     logLevel: info
     stdoutOutput:
       enabled: true
@@ -238,7 +238,7 @@ falco:
     
     http_output:
       enabled: ${ENABLE_SIDEKICK}
-      url: "http://${RELEASE_NAME}-falcosidekick:2801/"
+      url: "http://\${FALCO_FALCOSIDEKICK_SERVICE_HOST}:\${FALCO_FALCOSIDEKICK_SERVICE_PORT}/"
 
 falcosidekick:
   enabled: ${ENABLE_SIDEKICK}
@@ -246,6 +246,13 @@ falcosidekick:
     enabled: ${ENABLE_SIDEKICK}
     service:
       type: ClusterIP
+
+  config:
+    debug: true
+    redis:
+      address: "${RELEASE_NAME}-falcosidekick-ui-redis:6379"
+      port: "6379"
+      minimumpriority: "debug"
 
   # Configure Redis to use local air-gapped image
   redis:
@@ -306,11 +313,16 @@ extraVolumes:
   - name: test-rules
     configMap:
       name: falco-falco-airgapped-rules-local-test-rules-yaml
+  - name: debugfs
+    hostPath:
+      path: /sys/kernel/debug
 
 extraVolumeMounts:
   - name: test-rules
     mountPath: /etc/falco/rules.d/local_test_rules.yaml
     subPath: local_test_rules.yaml
+  - name: debugfs
+    mountPath: /sys/kernel/debug
 
 customRules:
   local_test_rules.yaml: |-
