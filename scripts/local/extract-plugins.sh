@@ -60,7 +60,7 @@ for i in "${!PLUGIN_NAMES[@]}"; do
     if ! docker run --rm \
         --user root \
         -v "${EXTRACTED_DIR}:/plugins" \
-        falcosecurity/falcoctl:0.11.0 \
+        falcosecurity/falcoctl:0.11.4 \
         artifact install "ghcr.io/falcosecurity/plugins/plugin/${plugin_name}:${version}" --plugins-dir /plugins; then
         
         log_error "  Failed to download plugin ${plugin_name}"

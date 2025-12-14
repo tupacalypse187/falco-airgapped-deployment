@@ -7,7 +7,7 @@ LABEL version="0.41.0-s3"
 
 # Build arguments
 ARG FALCO_VERSION=0.41.0
-ARG FALCOCTL_VERSION=0.11.1
+ARG FALCOCTL_VERSION=0.11.4
 ARG AWS_CLI_VERSION=2.15.0
 
 # Environment variables

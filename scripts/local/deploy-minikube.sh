@@ -161,6 +161,23 @@ deploy_falco() {
     
     log_info "  Plugin loading strategy: ${PLUGIN_STRATEGY}"
 
+    # Ask user for driver kind
+    echo ""
+    echo "Select driver kind (If unsure, 'modern_ebpf' is faster, 'ebpf' is more compatible with VMs/Mac):"
+    echo "  1) Modern eBPF (default)"
+    echo "  2) Standard eBPF (requires driver loader - NOT supported on Minikube LinuxKit)"
+    read -p "Enter choice [1-2]: " driver_choice
+    
+    DRIVER_KIND="modern_ebpf"
+    DRIVER_LOADER_ENABLED="false"
+    
+    if [ "$driver_choice" = "2" ]; then
+        DRIVER_KIND="ebpf"
+        DRIVER_LOADER_ENABLED="true"
+    fi
+    
+    log_info "  Driver kind: ${DRIVER_KIND}"
+
     # Ask if user wants to load images (optional)
     echo ""
     echo "Do you want to load images into Minikube? (Recommended for first deploy or after rebuild)"
@@ -178,6 +195,11 @@ deploy_falco() {
             minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falcosidekick:2.28.0"
             minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falcosidekick-ui:2.2.0"
             minikube -p falcosecurity image load "${LOCAL_REGISTRY}/redis:alpine"
+        fi
+
+        if [ "$DRIVER_LOADER_ENABLED" = "true" ]; then
+            log_info "  Loading Driver Loader image..."
+            minikube -p falcosecurity image load "${LOCAL_REGISTRY}/falcosecurity/falco-driver-loader:${FALCO_VERSION}"
         fi
         log_info "  ✓ Images loaded into Minikube"
     else
@@ -197,6 +219,12 @@ falco:
   config:
     engine:
       kind: modern_ebpf
+
+    # Ensure alerts are visible in logs (text format)
+    jsonOutput: false
+    logLevel: info
+    stdoutOutput:
+      enabled: true
 
     plugins:
       - name: k8saudit
@@ -250,9 +278,16 @@ fi)
 
 driver:
   enabled: true
-  kind: modern_ebpf
+  kind: ${DRIVER_KIND}
   loader:
-    enabled: false
+    enabled: ${DRIVER_LOADER_ENABLED}
+    initContainer:
+      enabled: ${DRIVER_LOADER_ENABLED}
+      image:
+        registry: "${LOCAL_REGISTRY}"
+        repository: "falcosecurity/falco-driver-loader"
+        tag: "${FALCO_VERSION}"
+        pullPolicy: IfNotPresent
 
 daemonset:
   tolerations:
@@ -266,6 +301,31 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
+
+extraVolumes:
+  - name: test-rules
+    configMap:
+      name: falco-falco-airgapped-rules-local-test-rules-yaml
+
+extraVolumeMounts:
+  - name: test-rules
+    mountPath: /etc/falco/rules.d/local_test_rules.yaml
+    subPath: local_test_rules.yaml
+
+customRules:
+  local_test_rules.yaml: |-
+    - rule: Terminal Shell in Container
+      desc: A shell was spawned in a container with an attached terminal.
+      condition: >
+        spawned_process and container
+        and shell_procs
+      output: >
+        Shell spawned in a container
+        (user=%user.name user_loginuid=%user.loginuid
+        container_id=%container.id container_name=%container.name
+        shell=%proc.name parent=%proc.pname cmdline=%proc.cmdline terminal=%proc.tty)
+      priority: WARNING
+      tags: [container, shell, mitre_execution]
 EOF
     
     log_info "  Generated Helm values:"

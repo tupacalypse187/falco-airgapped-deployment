@@ -45,6 +45,7 @@ data:
     log_stderr: {{ .Values.falco.config.logStderr }}
     log_syslog: {{ .Values.falco.config.logSyslog }}
     log_level: {{ .Values.falco.config.logLevel }}
+    json_output: {{ .Values.falco.config.jsonOutput }}
     
     # Output channels
     stdout_output:

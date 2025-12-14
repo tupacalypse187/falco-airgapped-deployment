@@ -82,6 +82,7 @@ falco:
     logStderr: true
     logSyslog: false
     logLevel: info
+    jsonOutput: false
     
     # Output channels
     stdoutOutput:

@@ -238,6 +238,24 @@ prepare_sidekick_images() {
     log_info "  ✓ Falcosidekick images prepared"
 }
 
+# Prepare Falco Driver Loader image
+prepare_driver_loader_image() {
+    log_step "Preparing Falco Driver Loader image..."
+    
+    # Check if we should use a specific version or fallback to FALCO_VERSION
+    # Usually driver loader version matches Falco version, or is close.
+    DRIVER_LOADER_VERSION="${FALCO_VERSION}"
+    
+    local source_image="falcosecurity/falco-driver-loader:${DRIVER_LOADER_VERSION}"
+    local target_image="${LOCAL_REGISTRY}/falcosecurity/falco-driver-loader:${DRIVER_LOADER_VERSION}"
+    
+    log_info "  Processing ${source_image}..."
+    docker pull "${source_image}"
+    docker tag "${source_image}" "${target_image}"
+    docker push "${target_image}"
+    log_info "  ✓ Pushed ${target_image}"
+}
+
 # Update Helm chart dependencies
 update_chart_deps() {
     log_step "Updating Helm chart dependencies..."
@@ -300,6 +318,8 @@ main() {
             update_chart_deps
             echo ""
             prepare_sidekick_images
+            echo ""
+            prepare_driver_loader_image
             echo ""
             build_falco_base
             echo ""
