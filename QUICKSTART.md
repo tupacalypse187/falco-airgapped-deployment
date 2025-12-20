@@ -71,6 +71,42 @@ bash deploy-eks.sh --build
 kubectl get pods -n falco-dev
 kubectl logs -n falco-dev -l app.kubernetes.io/name=falco-airgapped -f
 ```
+## Download Release Binaries
+
+### Step 1: Retrieve Metadata and Download Assets
+
+Set variables for the source repository details
+```
+ORIGINAL_REPO="falcosecurity/falcoctl"
+TAG="v0.11.4"
+DOWNLOAD_DIR="./falcoctl_assets"
+```
+
+1a. Store the original title and body in shell variables
+```
+TITLE=$(gh release view $TAG --repo $ORIGINAL_REPO --json name --template '{{.name}}')
+BODY=$(gh release view $TAG --repo $ORIGINAL_REPO --json body --template '{{.body}}')
+```
+
+1b. Create the download directory if it doesn't exist
+```
+mkdir -p $DOWNLOAD_DIR
+```
+
+1c. Download all assets from the original release into the directory
+```
+gh release download $TAG --repo $ORIGINAL_REPO -D $DOWNLOAD_DIR
+```
+
+### Step 2: Create a New Release on Your Fork
+
+Replace <YOUR_USERNAME> and <YOUR_FORK_NAME> with your details before running this command.
+```
+gh release create $TAG $DOWNLOAD_DIR/* \
+  --repo <YOUR_USERNAME>/<YOUR_FORK_NAME> \
+  --title "$TITLE" \
+  --notes "$BODY"
+```
 
 ## Next Steps
 
