@@ -188,6 +188,9 @@ Builds container images from your GitHub releases.
 # Build all images
 ./scripts/build-from-releases.sh
 
+# Build without S3 loader (sidecar strategy only - recommended for air-gapped)
+./scripts/build-from-releases.sh --skip-s3
+
 # Build specific image
 ./scripts/build-from-releases.sh --base-only
 ./scripts/build-from-releases.sh --s3-only
@@ -199,6 +202,22 @@ Builds container images from your GitHub releases.
 # Use different registry
 ./scripts/build-from-releases.sh --registry my-registry.com:5000
 ```
+
+### Sidecar-Only Workflow (Recommended)
+
+For fully air-gapped deployments, you only need the sidecar strategy (no S3):
+
+```bash
+# Create releases without AWS CLI
+./scripts/create-github-releases.sh --skip-awscli
+
+# Build images without S3 loader
+./scripts/build-from-releases.sh --skip-s3
+```
+
+This produces only:
+- `falco:VERSION-almalinux9` - Base Falco image
+- `falco-plugin-loader:VERSION` - Plugin sidecar (init container)
 
 ## Manual Steps (Alternative)
 

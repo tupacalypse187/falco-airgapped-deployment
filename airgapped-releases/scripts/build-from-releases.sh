@@ -16,6 +16,7 @@
 #   --base-only        Build only the base Falco image
 #   --s3-only          Build only the S3 loader image
 #   --plugin-only      Build only the plugin loader image
+#   --skip-s3          Skip S3 loader image (build base + plugin only)
 #   --push             Push to local registry after building
 #   --registry URL     Override registry (default: localhost:5000)
 #   -h, --help         Show this help message
@@ -254,6 +255,10 @@ main() {
                 ;;
             --plugin-only)
                 BUILD_BASE=false
+                BUILD_S3=false
+                shift
+                ;;
+            --skip-s3)
                 BUILD_S3=false
                 shift
                 ;;
