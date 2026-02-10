@@ -1,0 +1,132 @@
+FROM almalinux:9
+
+# =============================================================================
+# Falco Air-Gapped Deployment - S3 Plugin Loader Image
+# =============================================================================
+# This Dockerfile downloads Falco and AWS CLI binaries from YOUR GitHub releases
+# instead of upstream sources, enabling true air-gapped deployment.
+#
+# Build with:
+#   docker build --build-arg GITHUB_REPO="your-user/your-repo" \
+#                --build-arg FALCO_VERSION="0.42.1" \
+#                -t falco:0.42.1-s3-almalinux9 \
+#                -f Dockerfile.s3-loader .
+# =============================================================================
+
+# Metadata
+LABEL maintainer="your-team@company.com"
+LABEL description="Falco Security with S3 Plugin Loader - Air-gapped on AlmaLinux 9 (GitHub Releases)"
+
+# Build arguments - YOUR GitHub repository
+ARG GITHUB_REPO
+ARG FALCO_VERSION=0.42.1
+ARG FALCOCTL_VERSION=0.11.4
+ARG AWSCLI_RELEASE_TAG=awscli-v2
+
+# Validate GITHUB_REPO is provided
+RUN if [ -z "${GITHUB_REPO}" ]; then \
+        echo "ERROR: GITHUB_REPO build argument is required"; \
+        echo "Usage: docker build --build-arg GITHUB_REPO=user/repo ..."; \
+        exit 1; \
+    fi
+
+# Environment variables
+ENV FALCO_VERSION=${FALCO_VERSION}
+ENV FALCOCTL_VERSION=${FALCOCTL_VERSION}
+ENV FALCO_BIN_DIR=/usr/bin
+ENV FALCO_CONFIG_DIR=/etc/falco
+ENV FALCO_PLUGINS_DIR=/usr/share/falco/plugins
+ENV FALCO_RULES_DIR=/etc/falco/rules.d
+
+# S3 plugin loader configuration
+ENV S3_BUCKET=""
+ENV S3_PREFIX="falco-plugins/"
+ENV AWS_REGION="us-east-1"
+ENV PLUGIN_DOWNLOAD_TIMEOUT=300
+
+# Install system dependencies including AWS CLI deps
+RUN dnf install -y --allowerasing \
+    ca-certificates \
+    curl \
+    gnupg \
+    jq \
+    tar \
+    gzip \
+    unzip \
+    python3 \
+    python3-pip \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Install AWS CLI v2 from YOUR GitHub releases
+ARG GITHUB_REPO
+ARG AWSCLI_RELEASE_TAG
+RUN ARCH=$(uname -m) && \
+    echo "Downloading AWS CLI for ${ARCH} from GitHub release..." && \
+    curl -L -o /tmp/awscliv2.zip \
+    "https://github.com/${GITHUB_REPO}/releases/download/${AWSCLI_RELEASE_TAG}/awscli-exe-linux-${ARCH}.zip" && \
+    unzip /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/aws* && \
+    aws --version && \
+    echo "AWS CLI installed successfully"
+
+# Create necessary directories
+RUN mkdir -p \
+    ${FALCO_BIN_DIR} \
+    ${FALCO_CONFIG_DIR} \
+    ${FALCO_PLUGINS_DIR} \
+    ${FALCO_RULES_DIR} \
+    /var/log/falco \
+    /var/run/secrets/kubernetes.io/serviceaccount \
+    /tmp/plugins
+
+# Download and install Falco from YOUR GitHub releases
+RUN ARCH=$(uname -m) && \
+    echo "Downloading Falco ${FALCO_VERSION} for ${ARCH} from GitHub release..." && \
+    curl -L -o /tmp/falco.tar.gz \
+    "https://github.com/${GITHUB_REPO}/releases/download/falco-v${FALCO_VERSION}/falco-${FALCO_VERSION}-${ARCH}.tar.gz" && \
+    tar -xzf /tmp/falco.tar.gz -C /tmp && \
+    cp -r /tmp/falco-${FALCO_VERSION}-${ARCH}/usr/bin/* ${FALCO_BIN_DIR}/ && \
+    cp -r /tmp/falco-${FALCO_VERSION}-${ARCH}/etc/falco/* ${FALCO_CONFIG_DIR}/ && \
+    rm -rf /tmp/falco* && \
+    chmod +x ${FALCO_BIN_DIR}/falco && \
+    echo "Falco installed successfully"
+
+# Download and install falcoctl from YOUR GitHub releases
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then ARCH="amd64"; fi && \
+    if [ "$ARCH" = "aarch64" ]; then ARCH="arm64"; fi && \
+    echo "Downloading falcoctl ${FALCOCTL_VERSION} for ${ARCH} from GitHub release..." && \
+    curl -L -o /tmp/falcoctl.tar.gz \
+    "https://github.com/${GITHUB_REPO}/releases/download/falcoctl-v${FALCOCTL_VERSION}/falcoctl_${FALCOCTL_VERSION}_linux_${ARCH}.tar.gz" && \
+    tar -xzf /tmp/falcoctl.tar.gz -C /tmp && \
+    mv /tmp/falcoctl ${FALCO_BIN_DIR}/falcoctl && \
+    chmod +x ${FALCO_BIN_DIR}/falcoctl && \
+    rm -rf /tmp/falcoctl* && \
+    echo "falcoctl installed successfully"
+
+# Copy S3 plugin loader script
+COPY s3-plugin-loader.sh /usr/local/bin/s3-plugin-loader.sh
+RUN chmod +x /usr/local/bin/s3-plugin-loader.sh
+
+# Copy Falco startup wrapper script
+COPY falco-wrapper.sh /usr/local/bin/falco-wrapper.sh
+RUN chmod +x /usr/local/bin/falco-wrapper.sh
+
+# Copy default Falco configuration
+COPY falco.yaml ${FALCO_CONFIG_DIR}/falco.yaml
+
+# Create a non-root user for Falco (optional)
+RUN groupadd -r falco && useradd -r -g falco falco
+
+# Expose gRPC and metrics ports
+EXPOSE 5060 8765
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD ${FALCO_BIN_DIR}/falco --version || exit 1
+
+# Use wrapper script that downloads plugins from S3 before starting Falco
+ENTRYPOINT ["/usr/local/bin/falco-wrapper.sh"]
+CMD ["/usr/bin/falco", "-c", "/etc/falco/falco.yaml"]

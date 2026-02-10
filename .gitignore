@@ -2,6 +2,10 @@
 plugins/extracted/*.so
 plugins/source/*
 
+# Air-gapped releases downloads (temporary)
+airgapped-releases/downloads/*
+!airgapped-releases/downloads/.gitkeep
+
 # Temporary files
 *.tmp
 *.log

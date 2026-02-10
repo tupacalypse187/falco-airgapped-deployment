@@ -1,0 +1,129 @@
+# Falco configuration file for air-gapped deployment
+# This is a minimal configuration that will be extended by Kubernetes ConfigMaps
+
+# Rules files to load
+rules_file:
+  - /etc/falco/falco_rules.yaml
+  - /etc/falco/falco_rules.local.yaml
+  - /etc/falco/rules.d
+
+# Plugins configuration
+plugins:
+  - name: k8saudit-eks
+    library_path: /usr/share/falco/plugins/k8saudit-eks.so
+    init_config: ""
+    open_params: ""
+  
+  - name: container
+    library_path: /usr/share/falco/plugins/container.so
+    init_config: ""
+
+# Load plugins
+load_plugins: []
+
+# Watch config file for changes
+watch_config_files: true
+
+# Logging
+log_stderr: true
+log_syslog: false
+log_level: info
+
+# Output channels
+stdout_output:
+  enabled: true
+
+# File output
+file_output:
+  enabled: true
+  keep_alive: false
+  filename: /var/log/falco/events.log
+
+# Program output (for forwarding to external systems)
+program_output:
+  enabled: false
+  keep_alive: false
+  program: "jq '{text: .output}' | curl -d @- -X POST https://hooks.slack.com/services/XXX"
+
+# HTTP output
+http_output:
+  enabled: false
+  url: "http://falcosidekick:2801"
+  user_agent: "falcosecurity/falco"
+
+# gRPC server
+grpc:
+  enabled: false
+  bind_address: "0.0.0.0:5060"
+  threadiness: 0
+
+# gRPC output
+grpc_output:
+  enabled: false
+
+# Metrics
+metrics:
+  enabled: true
+  interval: 1h
+  output_rule: true
+  resource_utilization_enabled: true
+  state_counters_enabled: true
+  kernel_event_counters_enabled: true
+  libbpf_stats_enabled: true
+  convert_memory_to_mb: true
+  include_empty_values: false
+
+# Webserver for metrics
+webserver:
+  enabled: true
+  listen_port: 8765
+  k8s_healthz_endpoint: /healthz
+  ssl_enabled: false
+
+# Syscall event drops
+syscall_event_drops:
+  threshold: 0.1
+  actions:
+    - log
+    - alert
+  rate: 0.03333
+  max_burst: 1
+
+# Syscall event timeouts
+syscall_event_timeouts:
+  max_consecutives: 1000
+
+# Output formatting
+output_timeout: 2000
+outputs:
+  rate: 1
+  max_burst: 1000
+
+# Priority level for rules
+priority: debug
+
+# Buffered outputs
+buffered_outputs: false
+
+# Syscall buffer size
+syscall_buf_size_preset: 4
+
+# Base syscalls
+base_syscalls:
+  custom_set: []
+  repair: false
+
+# Modern BPF
+modern_bpf:
+  cpus_for_each_syscall_buffer: 2
+
+# Engine configuration
+engine:
+  kind: modern_bpf
+  modern_bpf:
+    cpus_for_each_syscall_buffer: 2
+  kmod:
+    buf_size_preset: 4
+  ebpf:
+    buf_size_preset: 4
+    drop_failed_exit: false
