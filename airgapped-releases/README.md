@@ -24,6 +24,26 @@ curl --version
 docker --version
 ```
 
+### Multiple GitHub Accounts
+
+If you use multiple GitHub accounts (e.g., work enterprise and personal), you'll need to switch to the correct account before running the scripts:
+
+```bash
+# Add your public GitHub account (one-time setup)
+gh auth login --hostname github.com
+
+# Switch to public GitHub before running scripts
+gh auth switch --hostname github.com
+
+# Switch back to your enterprise GitHub when done
+gh auth switch --hostname github.your-company.com
+```
+
+List all configured accounts:
+```bash
+gh auth status
+```
+
 ## Binary Sources Reference
 
 | Component | Version | Upstream Source |
@@ -47,7 +67,15 @@ nano versions.env
 GITHUB_REPO="your-username/falco-airgapped-deployment"
 ```
 
-### Step 2: Download Binaries & Create Releases
+### Step 2: Switch GitHub Account (if needed)
+
+If you have multiple GitHub accounts, switch to the one that owns this repository:
+
+```bash
+gh auth switch --hostname github.com
+```
+
+### Step 3: Download Binaries & Create Releases
 
 Run the setup script to download all binaries and create GitHub releases:
 
@@ -61,7 +89,7 @@ This creates the following releases in your repository:
 - `awscli-v2` - AWS CLI v2 (x86_64 + aarch64)
 - `plugins-v1.0.0` - Pre-extracted plugin .so files
 
-### Step 3: Build Container Images
+### Step 4: Build Container Images
 
 Build container images that pull from YOUR GitHub releases:
 
@@ -74,7 +102,7 @@ This builds:
 - `localhost:5000/falcosecurity/falco:0.42.1-s3-almalinux9` - S3 loader variant
 - `localhost:5000/falcosecurity/falco-plugin-loader:v1.0.0` - Plugin sidecar
 
-### Step 4: Deploy
+### Step 5: Deploy
 
 For local testing with Minikube:
 ```bash
@@ -86,6 +114,14 @@ For AWS EKS:
 ```bash
 cd ../scripts/aws
 ./deploy-eks.sh
+```
+
+### Step 6: Switch Back (if needed)
+
+If you switched GitHub accounts earlier, switch back to your default:
+
+```bash
+gh auth switch --hostname github.your-company.com
 ```
 
 ## Keeping Up to Date
