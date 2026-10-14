@@ -1,8 +1,18 @@
-# Production Deployment Guide for AWS EKS
+# ☁️ Production Deployment Guide for AWS EKS
 
 This guide provides instructions for deploying Falco to a production environment on AWS EKS using the provided Jenkins pipeline.
 
-## Prerequisites
+## 📑 Table of Contents
+
+- [📋 Prerequisites](#-prerequisites)
+- [👷 Step 1: Set Up the Jenkins Pipeline](#-step-1-set-up-the-jenkins-pipeline)
+- [👣 Step 2: Configure Pipeline Parameters](#-step-2-configure-pipeline-parameters)
+- [👷 Step 3: Run the Jenkins Pipeline](#-step-3-run-the-jenkins-pipeline)
+- [🚀 Manual Deployment](#-manual-deployment)
+- [🚀 Verifying the Deployment](#-verifying-the-deployment)
+- [🏁 Conclusion](#-conclusion)
+
+## 📋 Prerequisites
 
 - An AWS account with the necessary permissions to create and manage EKS clusters, ECR repositories, and S3 buckets.
 - An EKS cluster.
@@ -14,14 +24,14 @@ This guide provides instructions for deploying Falco to a production environment
   - A configured agent with `docker`, `kubectl`, `helm`, and `aws-cli` installed. A `Dockerfile` for a custom Jenkins agent is provided in the `jenkins` directory.
   - AWS credentials configured in Jenkins.
 
-## Step 1: Set Up the Jenkins Pipeline
+## 👷 Step 1: Set Up the Jenkins Pipeline
 
 1.  Create a new pipeline job in Jenkins.
 2.  In the pipeline configuration, select "Pipeline script from SCM".
 3.  Choose "Git" as the SCM and provide the URL to your Git repository.
 4.  The script path should be `jenkins/Jenkinsfile`.
 
-## Step 2: Configure Pipeline Parameters
+## 👣 Step 2: Configure Pipeline Parameters
 
 The Jenkins pipeline is parameterized to allow for flexible deployments. Here are the available parameters:
 
@@ -35,7 +45,7 @@ The Jenkins pipeline is parameterized to allow for flexible deployments. Here ar
 - `BUILD_IMAGES`: A boolean to control whether to build and push the container images.
 - `DEPLOY_TO_EKS`: A boolean to control whether to deploy Falco to the EKS cluster.
 
-## Step 3: Run the Jenkins Pipeline
+## 👷 Step 3: Run the Jenkins Pipeline
 
 1.  Start the Jenkins pipeline by clicking "Build with Parameters".
 2.  Fill in the parameters according to your environment and desired configuration.
@@ -52,7 +62,7 @@ The Jenkins pipeline is parameterized to allow for flexible deployments. Here ar
     10. **Deploy Falco with Helm**: Deploys Falco to your EKS cluster using the Helm chart.
     11. **Verify Deployment**: Checks the status of the Falco pods and displays recent logs.
 
-## Manual Deployment
+## 🚀 Manual Deployment
 
 If you prefer to deploy manually without using the Jenkins pipeline, you can use the `deploy-eks.sh` script in the `scripts/aws` directory.
 
@@ -72,7 +82,7 @@ If you prefer to deploy manually without using the Jenkins pipeline, you can use
 
     You can also use the `PLUGIN_STRATEGY` and `S3_BUCKET` environment variables to control the plugin loading strategy.
 
-## Verifying the Deployment
+## 🚀 Verifying the Deployment
 
 After the deployment is complete, you can verify it by:
 
@@ -88,6 +98,6 @@ After the deployment is complete, you can verify it by:
   kubectl logs -n falco-<your-env> -l app.kubernetes.io/name=falco-airgapped -f
   ```
 
-## Conclusion
+## 🏁 Conclusion
 
 This project provides a robust and flexible solution for deploying Falco in air-gapped environments. By using pre-built plugin artifacts and custom container images, you can ensure that your Falco deployment is secure and self-contained, with no reliance on external resources.

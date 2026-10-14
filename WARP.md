@@ -1,10 +1,10 @@
-# WARP.md
+# 🤖 WARP.md
 
 This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
-## Common Development Commands
+## ⌨️ Common Development Commands
 
-### Local Development (Minikube)
+### 🛠️ Local Development (Minikube)
 
 This project uses a set of scripts in `scripts/local/` to manage the local development lifecycle.
 
@@ -31,7 +31,7 @@ This project uses a set of scripts in `scripts/local/` to manage the local devel
     kubectl logs -n falco -l app.kubernetes.io/name=falco-airgapped -f
     ```
 
-### Production Deployment (AWS EKS)
+### ☁️ Production Deployment (AWS EKS)
 
 Deployment to AWS is managed via `scripts/aws/deploy-eks.sh` or the Jenkins pipeline.
 
@@ -44,18 +44,18 @@ Deployment to AWS is managed via `scripts/aws/deploy-eks.sh` or the Jenkins pipe
     bash deploy-eks.sh --build
     ```
 
-## Architecture Overview
+## 🌟 Architecture Overview
 
 This project implements an **air-gapped deployment for Falco** on Kubernetes, avoiding runtime internet dependencies.
 
-### Core Strategy
+### 🔹 Core Strategy
 1.  **Plugin Extraction**: Official Falco plugins (`k8saudit-eks`, `container`) are extracted from their official container images in a connected environment and stored locally or in S3.
 2.  **Custom Images**: All images are rebuilt on **AlmaLinux 9** base to ensure security compliance and independence from public registries.
     -   `base`: Core Falco runtime (`docker/base/Dockerfile`).
     -   `s3-loader`: Falco + AWS CLI for pulling plugins from S3 (`docker/base/Dockerfile.s3`).
     -   `plugin-loader`: Sidecar init container containing pre-extracted plugins (`docker/plugin-loader/Dockerfile`).
 
-### Plugin Loading Strategies
+### 🧩 Plugin Loading Strategies
 The Helm chart (`helm/falco-airgapped`) supports two modes via `values.yaml`:
 
 1.  **Sidecar (Default)**:
@@ -68,6 +68,6 @@ The Helm chart (`helm/falco-airgapped`) supports two modes via `values.yaml`:
     -   **Pros**: Centralized plugin management, smaller images, easier plugin updates without redeploying images.
     -   **Cons**: Requires IAM permissions and connectivity to S3.
 
-### Automation
+### 🔹 Automation
 -   **Jenkins**: A `Jenkinsfile` orchestrates the entire pipeline: Plugin extraction -> Build -> ECR Push -> Helm Deploy.
 -   **Helm**: The chart is designed to be flexible for both local (Minikube) and production (EKS) environments using the same templates but different values.

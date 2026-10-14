@@ -1,10 +1,23 @@
-# Technical Reference
+# 📚 Technical Reference
 
 This document provides detailed technical information about the Falco air-gapped deployment project.
 
-## Container Images
+## 📑 Table of Contents
 
-### Falco Base Image
+- [🐳 Container Images](#-container-images)
+- [🧩 Falco Plugins](#-falco-plugins)
+- [⚙️ Helm Chart Configuration](#️-helm-chart-configuration)
+- [📜 Script Reference](#-script-reference)
+- [👷 Jenkins Pipeline](#-jenkins-pipeline)
+- [📋 Network Requirements](#-network-requirements)
+- [🔐 Security Best Practices](#-security-best-practices)
+- [⚡ Performance Tuning](#-performance-tuning)
+- [📈 Monitoring and Observability](#-monitoring-and-observability)
+- [🆘 Troubleshooting](#-troubleshooting)
+
+## 🐳 Container Images
+
+### 🔹 Falco Base Image
 
 **Image Name**: `falcosecurity/falco:0.41.0-almalinux9`
 
@@ -23,7 +36,7 @@ This document provides detailed technical information about the Falco air-gapped
 
 **Health Check**: HTTP GET on `/healthz` endpoint at port 8765
 
-### Falco S3 Loader Image
+### 🔹 Falco S3 Loader Image
 
 **Image Name**: `falcosecurity/falco:0.41.0-s3-almalinux9`
 
@@ -40,7 +53,7 @@ This document provides detailed technical information about the Falco air-gapped
 - `PLUGIN_DOWNLOAD_TIMEOUT`: Download timeout in seconds (default: 300)
 - `FAIL_ON_PLUGIN_ERROR`: Whether to fail if plugin download fails (default: true)
 
-### Plugin Loader Sidecar Image
+### 🧩 Plugin Loader Sidecar Image
 
 **Image Name**: `falcosecurity/falco-plugin-loader:1.0.0`
 
@@ -53,7 +66,7 @@ This document provides detailed technical information about the Falco air-gapped
 
 **Volume Mount**: Expects target directory at `/usr/share/falco/plugins` (configurable via `FALCO_PLUGINS_DIR`)
 
-### Falcosidekick Images
+### 🔹 Falcosidekick Images
 
 **Images**:
 - `falcosecurity/falcosidekick:2.28.0`: Forwards events
@@ -63,14 +76,14 @@ This document provides detailed technical information about the Falco air-gapped
 **Air-Gapped Handling**:
 These images are pulled during the "Full Build" phase and pushed to the local registry to ensure 100% offline compatibility during deployment.
 
-## Falco Plugins
+## 🧩 Falco Plugins
 
-### k8saudit Plugin (Local/Generic)
+### 🧩 k8saudit Plugin (Local/Generic)
 **Version**: 0.10.0
 **Event Source**: `k8s_audit`
 **Purpose**: Generic Kubernetes audit log support (used for Minikube/local testing)
 
-### k8saudit-eks Plugin (AWS)
+### 🧩 k8saudit-eks Plugin (AWS)
 
 **Version**: 0.10.0
 
@@ -89,7 +102,7 @@ These images are pulled during the "Full Build" phase and pushed to the local re
 
 **File Location**: `/usr/share/falco/plugins/k8saudit-eks-0.10.0.so`
 
-### container Plugin
+### 🧩 container Plugin
 
 **Version**: 0.4.1
 
@@ -103,9 +116,9 @@ These images are pulled during the "Full Build" phase and pushed to the local re
 
 **File Location**: `/usr/share/falco/plugins/container-0.4.1.so`
 
-## Helm Chart Configuration
+## ⚙️ Helm Chart Configuration
 
-### Key Values
+### 🔑 Key Values
 
 **Image Configuration**:
 ```yaml
@@ -174,7 +187,7 @@ falcosidekick:
       registry: "localhost:5000"
 ```
 
-### Kubernetes Resources Created
+### 🔹 Kubernetes Resources Created
 
 The Helm chart creates the following Kubernetes resources:
 
@@ -186,9 +199,9 @@ The Helm chart creates the following Kubernetes resources:
 6. **Service**: Exposes gRPC and metrics ports
 7. **ServiceMonitor** (optional): For Prometheus Operator integration
 
-## Script Reference
+## 📜 Script Reference
 
-### extract-plugins.sh
+### 🧩 extract-plugins.sh
 
 **Location**: `scripts/local/extract-plugins.sh`
 
@@ -206,7 +219,7 @@ The Helm chart creates the following Kubernetes resources:
 5. Copies found plugins to extracted directory
 6. Cleans up temporary containers and files
 
-### build-local.sh
+### 🔨 build-local.sh
 
 **Location**: `scripts/local/build-local.sh`
 
@@ -228,7 +241,7 @@ The Helm chart creates the following Kubernetes resources:
 5. Build plugin loader image only
 6. Full build (extract + build all)
 
-### deploy-minikube.sh
+### 🚀 deploy-minikube.sh
 
 **Location**: `scripts/local/deploy-minikube.sh`
 
@@ -244,7 +257,7 @@ The Helm chart creates the following Kubernetes resources:
 - Deploys using Helm
 - Verifies deployment and shows logs
 
-### deploy-eks.sh
+### 🚀 deploy-eks.sh
 
 **Location**: `scripts/aws/deploy-eks.sh`
 
@@ -265,9 +278,9 @@ The Helm chart creates the following Kubernetes resources:
 - `--build`: Build and push images before deploying
 - `--deploy-only`: Deploy only without building
 
-## Jenkins Pipeline
+## 👷 Jenkins Pipeline
 
-### Pipeline Parameters
+### 🔹 Pipeline Parameters
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
@@ -281,7 +294,7 @@ The Helm chart creates the following Kubernetes resources:
 | BUILD_IMAGES | Boolean | Build and push images | true |
 | DEPLOY_TO_EKS | Boolean | Deploy to EKS | true |
 
-### Pipeline Stages
+### 🔹 Pipeline Stages
 
 1. **Validate Parameters**: Ensures all required parameters are provided
 2. **Checkout**: Checks out code from SCM
@@ -295,7 +308,7 @@ The Helm chart creates the following Kubernetes resources:
 10. **Deploy Falco with Helm**: Deploys using Helm chart
 11. **Verify Deployment**: Checks pod status and logs
 
-### Custom Jenkins Agent
+### 👷 Custom Jenkins Agent
 
 **Dockerfile**: `jenkins/Dockerfile.jenkins-agent`
 
@@ -309,9 +322,9 @@ The Helm chart creates the following Kubernetes resources:
 
 **Purpose**: Provides all necessary tools for running the pipeline
 
-## Network Requirements
+## 📋 Network Requirements
 
-### Local Testing
+### 🧪 Local Testing
 
 **Outbound Access Required** (during build phase only):
 - ghcr.io: For pulling official Falco plugin containers
@@ -322,7 +335,7 @@ The Helm chart creates the following Kubernetes resources:
 - All images pulled from localhost:5000
 - No external network dependencies
 
-### Production Deployment
+### ☁️ Production Deployment
 
 **Outbound Access Required** (during build phase only):
 - ghcr.io: For pulling official Falco plugin containers
@@ -335,9 +348,9 @@ The Helm chart creates the following Kubernetes resources:
 - All plugins pre-loaded in init container
 - No external network dependencies
 
-## Security Best Practices
+## 🔐 Security Best Practices
 
-### IAM Permissions
+### 🔹 IAM Permissions
 
 **For S3 Plugin Strategy**:
 ```json
@@ -378,7 +391,7 @@ The Helm chart creates the following Kubernetes resources:
 }
 ```
 
-### RBAC Configuration
+### ⚙️ RBAC Configuration
 
 The Helm chart creates a ClusterRole with minimal required permissions:
 - Read access to pods, nodes, namespaces, services, events
@@ -387,7 +400,7 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 - Read access to pod logs (for container plugin)
 - Read access to configmaps (for k8s audit plugin)
 
-### Pod Security
+### 🔐 Pod Security
 
 **Security Context**:
 - Runs as root (required for system call monitoring)
@@ -400,9 +413,9 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 - SYS_RESOURCE: For resource limit adjustments
 - SYS_PTRACE: For process tracing
 
-## Performance Tuning
+## ⚡ Performance Tuning
 
-### Resource Allocation
+### 🔹 Resource Allocation
 
 **Minimum Requirements**:
 - CPU: 200m (0.2 cores)
@@ -412,7 +425,7 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 - CPU: 500m-1000m (0.5-1 cores)
 - Memory: 1-2Gi
 
-### Driver Selection
+### 🔹 Driver Selection
 
 **modern_bpf** (Recommended):
 - Best performance
@@ -429,7 +442,7 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 - Requires kernel module compilation
 - Best compatibility with older kernels
 
-### Buffer Sizing
+### 🔹 Buffer Sizing
 
 **Default**: 4 (syscall_buf_size_preset)
 
@@ -437,9 +450,9 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 
 **Trade-off**: Higher buffer size increases memory usage but reduces dropped events
 
-## Monitoring and Observability
+## 📈 Monitoring and Observability
 
-### Metrics Endpoint
+### 🔹 Metrics Endpoint
 
 **URL**: `http://pod-ip:8765/metrics`
 
@@ -451,13 +464,13 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 - `falco_outputs_total`: Total outputs generated
 - `falco_rules_matched_total`: Total rules matched
 
-### Health Check Endpoint
+### 🔹 Health Check Endpoint
 
 **URL**: `http://pod-ip:8765/healthz`
 
 **Response**: 200 OK when healthy
 
-### Logging
+### 🔹 Logging
 
 **Default Output**: stdout (captured by Kubernetes)
 
@@ -465,9 +478,9 @@ The Helm chart creates a ClusterRole with minimal required permissions:
 
 **Log Levels**: debug, info, warning, error, critical
 
-## Troubleshooting
+## 🆘 Troubleshooting
 
-### Plugin Loading Issues
+### 🧩 Plugin Loading Issues
 
 **Symptom**: Falco fails to start with plugin-related errors
 
@@ -482,7 +495,7 @@ kubectl logs -n falco <pod-name> -c falco
 - Incorrect plugin file permissions
 - Plugin version mismatch with Falco version
 
-### Driver Loading Issues
+### 🔹 Driver Loading Issues
 
 **Symptom**: Falco cannot load BPF program
 
@@ -497,7 +510,7 @@ kubectl logs -n falco <pod-name>
 - Missing kernel headers for ebpf/module
 - Insufficient permissions
 
-### Performance Issues
+### ⚡ Performance Issues
 
 **Symptom**: High CPU usage or dropped events
 

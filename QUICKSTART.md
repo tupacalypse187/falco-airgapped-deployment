@@ -1,10 +1,19 @@
-# Quick Start Guide
+# 🚀 Quick Start Guide
 
 Get Falco running in your air-gapped environment in under 30 minutes.
 
-## For Local Testing (Windows 11 / macOS)
+## 📑 Table of Contents
 
-### Prerequisites Check
+- [🧪 For Local Testing (Windows 11 / macOS)](#-for-local-testing-windows-11--macos)
+- [☁️ For AWS EKS Production](#️-for-aws-eks-production)
+- [⬇️ Download Release Binaries](#️-download-release-binaries)
+- [👉 Next Steps](#-next-steps)
+- [🆘 Common Issues](#-common-issues)
+- [💬 Support](#-support)
+
+## 🧪 For Local Testing (Windows 11 / macOS)
+
+### 📋 Prerequisites Check
 ```bash
 # Verify installations
 docker --version
@@ -13,7 +22,7 @@ kubectl version --client
 helm version
 ```
 
-### Three-Step Deployment
+### 🚀 Three-Step Deployment
 
 **Step 1: Extract Plugins and Build Images**
 ```bash
@@ -36,21 +45,21 @@ bash deploy-minikube.sh
 # Select option 1 (Load Images)
 ```
 
-### Verify Deployment
+### 🚀 Verify Deployment
 ```bash
 kubectl get pods -n falco
 # Access UI
 kubectl port-forward -n falco svc/falco-falcosidekick-ui 2802:2802
 ```
 
-## For AWS EKS Production
+## ☁️ For AWS EKS Production
 
-### Prerequisites
+### 📋 Prerequisites
 - AWS account with EKS cluster
 - ECR registry created
 - AWS CLI configured
 
-### Quick Deploy
+### 🚀 Quick Deploy
 ```bash
 # Set environment variables
 export ECR_REGISTRY="123456789012.dkr.ecr.us-east-1.amazonaws.com"
@@ -66,14 +75,14 @@ cd scripts/aws
 bash deploy-eks.sh --build
 ```
 
-### Verify Deployment
+### 🚀 Verify Deployment
 ```bash
 kubectl get pods -n falco-dev
 kubectl logs -n falco-dev -l app.kubernetes.io/name=falco-airgapped -f
 ```
-## Download Release Binaries
+## ⬇️ Download Release Binaries
 
-### Step 1: Retrieve Metadata and Download Assets
+### ⬇️ Step 1: Retrieve Metadata and Download Assets
 
 Set variables for the source repository details
 ```
@@ -98,7 +107,7 @@ mkdir -p $DOWNLOAD_DIR
 gh release download $TAG --repo $ORIGINAL_REPO -D $DOWNLOAD_DIR
 ```
 
-### Step 2: Create a New Release on Your Fork
+### 👣 Step 2: Create a New Release on Your Fork
 
 Replace <YOUR_USERNAME> and <YOUR_FORK_NAME> with your details before running this command.
 ```
@@ -108,13 +117,13 @@ gh release create $TAG $DOWNLOAD_DIR/* \
   --notes "$BODY"
 ```
 
-## Next Steps
+## 👉 Next Steps
 
 - Review the [Local Setup Guide](docs/README_LOCAL.md) for detailed local testing instructions
 - Review the [Production Deployment Guide](docs/README_PROD.md) for AWS deployment details
 - Review the [Project Overview](PROJECT_OVERVIEW.md) for architecture and design details
 
-## Common Issues
+## 🆘 Common Issues
 
 **Issue**: Plugins not extracting
 **Solution**: Ensure Docker is running and you have internet access
@@ -125,6 +134,6 @@ gh release create $TAG $DOWNLOAD_DIR/* \
 **Issue**: EKS deployment fails
 **Solution**: Verify AWS credentials: `aws sts get-caller-identity`
 
-## Support
+## 💬 Support
 
 For detailed troubleshooting, refer to the PROJECT_OVERVIEW.md file.

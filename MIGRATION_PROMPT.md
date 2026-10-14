@@ -1,7 +1,7 @@
-# Project Context: Falco Air-Gapped Deployment
+# 📦 Project Context: Falco Air-Gapped Deployment
 **Objective:** Deploy Falco with Falcosidekick and UI in a strictly air-gapped Minikube environment.
 
-## Current Status
+## 📊 Current Status
 - **Scripts**: [scripts/local/build-local.sh](file:///Users/cyantorno/programming/github/tupacalypse187/falcoproject/falco-airgapped-deployment/scripts/local/build-local.sh) and [deploy-minikube.sh](file:///Users/cyantorno/programming/github/tupacalypse187/falcoproject/falco-airgapped-deployment/scripts/local/deploy-minikube.sh) are fully updated.
     - They support building all images locally.
     - They handle air-gapped Helm deployment using local registry images.
@@ -12,7 +12,7 @@
     - Custom Rules (Injected via [deploy-minikube.sh](file:///Users/cyantorno/programming/github/tupacalypse187/falcoproject/falco-airgapped-deployment/scripts/local/deploy-minikube.sh)).
 - **Blocker on macOS**: The Docker Desktop LinuxKit kernel (`6.12.54-linuxkit`) lacks `sys_enter_execve` tracepoints, preventing Falco from detecting process spawns (no alerts).
 
-## Instructions for New Session (Ubuntu 24.04)
+## 📋 Instructions for New Session (Ubuntu 24.04)
 I have migrated to an Ubuntu 24.04 host to resolve the kernel issue. Please help me verify the deployment here.
 
 1.  **Verify Prerequisites**: Ensure Docker, Minikube, Helm, and kubectl are installed.

@@ -1,14 +1,21 @@
-# CLAUDE.md
+# 🤖 CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## 📑 Table of Contents
+
+- [🌟 Project Overview](#-project-overview)
+- [⌨️ Build Commands](#️-build-commands)
+- [🏗️ Architecture](#️-architecture)
+- [⌨️ Verification Commands](#️-verification-commands)
+
+## 🌟 Project Overview
 
 This project deploys Falco (cloud-native runtime security tool) in air-gapped environments with no internet access. It provides custom AlmaLinux 9-based container images and two plugin loading strategies: sidecar (init container) or S3 bucket.
 
-## Build Commands
+## ⌨️ Build Commands
 
-### Local Development (Minikube)
+### 🛠️ Local Development (Minikube)
 
 ```bash
 # Full build: extract plugins + build all images
@@ -23,7 +30,7 @@ minikube addons enable registry -p falcosecurity
 bash scripts/local/deploy-minikube.sh
 ```
 
-### AWS EKS Production
+### ☁️ AWS EKS Production
 
 ```bash
 export ECR_REGISTRY="123456789012.dkr.ecr.us-east-1.amazonaws.com"
@@ -34,7 +41,7 @@ export PLUGIN_STRATEGY="sidecar"  # or "s3"
 cd scripts/aws && bash deploy-eks.sh --build
 ```
 
-### Individual Build Steps
+### 🔨 Individual Build Steps
 
 ```bash
 # Extract plugins from official containers (requires internet)
@@ -44,9 +51,9 @@ bash scripts/local/extract-plugins.sh
 helm dependency update helm/falco-airgapped
 ```
 
-## Architecture
+## 🏗️ Architecture
 
-### Plugin Loading Strategies
+### 🧩 Plugin Loading Strategies
 
 The Helm chart supports two mutually exclusive plugin loading methods controlled by `pluginLoadingStrategy` in values.yaml:
 
@@ -54,7 +61,7 @@ The Helm chart supports two mutually exclusive plugin loading methods controlled
 
 2. **S3** (`pluginLoadingStrategy: "s3"`): Falco container downloads plugins from S3 bucket on startup. Requires S3 VPC endpoint for air-gapped networks.
 
-### Container Images
+### 🐳 Container Images
 
 All images built on AlmaLinux 9:
 
@@ -62,14 +69,14 @@ All images built on AlmaLinux 9:
 - `falcosecurity/falco:<version>-s3-almalinux9` - Falco with AWS CLI for S3 plugin loading (Dockerfile: `docker/base/Dockerfile.s3-loader`)
 - `falcosecurity/falco-plugin-loader:1.0.0` - Sidecar with pre-extracted plugins (Dockerfile: `docker/plugin-loader/Dockerfile`)
 
-### Key Versions
+### 🔑 Key Versions
 
 - Falco: 0.42.1
 - falcoctl: 0.11.4
 - Plugins: k8saudit/k8saudit-eks 0.10.0, container 0.4.1
 - Falcosidekick: 2.28.0, UI: 2.2.0
 
-### Helm Chart Structure
+### 🗂️ Helm Chart Structure
 
 The chart at `helm/falco-airgapped/` creates: DaemonSet, ServiceAccount, ClusterRole/Binding, ConfigMap, Service, and optionally ServiceMonitor. It includes falcosidekick as a subchart dependency.
 
@@ -78,11 +85,11 @@ Key template logic:
 - `templates/_helpers.tpl` - Template helpers for naming and labels
 - `values.yaml` - Plugin strategy toggle, image configs, Falco settings, driver selection (modern_bpf/ebpf)
 
-### Plugin Extraction Process
+### 🧩 Plugin Extraction Process
 
 `scripts/local/extract-plugins.sh` pulls official plugin containers from `ghcr.io`, extracts `.so` files from their filesystem, and stores them in `plugins/extracted/`. This runs on a machine with internet access; extracted plugins are committed or transferred to air-gapped environment.
 
-## Verification Commands
+## ⌨️ Verification Commands
 
 ```bash
 # Check pods

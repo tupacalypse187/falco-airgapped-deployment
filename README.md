@@ -1,4 +1,4 @@
-# Falco Air-Gapped Deployment Project
+# 🦅 Falco Air-Gapped Deployment Project
 
 A complete solution for deploying Falco, the cloud-native runtime
 security tool, in air-gapped environments with no internet access:
@@ -6,7 +6,14 @@ custom AlmaLinux 9 images, a private ECR registry, plugins delivered
 without public registries, local testing on Windows 11/macOS, and a
 Jenkins-driven production deployment on AWS EKS.
 
-## Start here
+## 📑 Table of Contents
+
+- [🎯 Start here](#-start-here)
+- [⚙️ How it works](#️-how-it-works)
+- [🗂️ Directory structure](#️-directory-structure)
+- [📋 Prerequisites](#-prerequisites)
+
+## 🎯 Start here
 
 | If you want to… | Read |
 |---|---|
@@ -17,7 +24,7 @@ Jenkins-driven production deployment on AWS EKS.
 | Look up image/plugin/chart internals | [TECHNICAL_REFERENCE.md](./TECHNICAL_REFERENCE.md) — container images, plugin loading strategies, configuration reference |
 | Stage a fully offline release from upstream binaries | [airgapped-releases/README.md](./airgapped-releases/README.md) — download upstream artifacts, publish GitHub releases, build images from them |
 
-## How it works
+## ⚙️ How it works
 
 1. **Extract plugin artifacts.** The official Falco plugin containers are
    pulled in an internet-connected environment and the compiled `.so`
@@ -32,7 +39,7 @@ Jenkins-driven production deployment on AWS EKS.
 4. **Automate with Jenkins.** The provided `Jenkinsfile` runs the whole
    chain — extract plugins, build images, deploy to EKS.
 
-## Directory structure
+## 🗂️ Directory structure
 
 ```
 falco-airgapped-deployment/
@@ -53,7 +60,7 @@ falco-airgapped-deployment/
     └── README_PROD.md       # Production deployment guide (AWS EKS)
 ```
 
-## Prerequisites
+## 📋 Prerequisites
 
 - **Local testing:** Docker Desktop, Minikube, `kubectl`, `helm`
 - **Production:** AWS account, EKS cluster, ECR registry, Jenkins server

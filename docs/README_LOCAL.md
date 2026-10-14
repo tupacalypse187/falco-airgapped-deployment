@@ -1,8 +1,18 @@
-# Local Setup and Testing Guide
+# 💻 Local Setup and Testing Guide
 
 This guide provides step-by-step instructions for setting up and testing the Falco air-gapped deployment on your local machine (Windows 11 or macOS) using Docker Desktop and Minikube.
 
-## Prerequisites
+## 📑 Table of Contents
+
+- [📋 Prerequisites](#-prerequisites)
+- [👣 Step 1: Clone the Project](#-step-1-clone-the-project)
+- [🐳 Step 2: Build the Container Images](#-step-2-build-the-container-images)
+- [👣 Step 3: Start and Configure Minikube](#-step-3-start-and-configure-minikube)
+- [🚀 Step 4: Deploy Falco to Minikube](#-step-4-deploy-falco-to-minikube)
+- [🚀 Step 5: Verify the Deployment](#-step-5-verify-the-deployment)
+- [🧹 Cleaning Up](#-cleaning-up)
+
+## 📋 Prerequisites
 
 Before you begin, make sure you have the following tools installed:
 
@@ -12,7 +22,7 @@ Before you begin, make sure you have the following tools installed:
 - **Helm**: [Installation Guide](https://helm.sh/docs/intro/install/)
 - **Git**: [Installation Guide](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
-## Step 1: Clone the Project
+## 👣 Step 1: Clone the Project
 
 First, clone this project to your local machine:
 
@@ -21,7 +31,7 @@ git clone https://github.com/your-org/falco-airgapped-deployment.git
 cd falco-airgapped-deployment
 ```
 
-## Step 2: Build the Container Images
+## 🐳 Step 2: Build the Container Images
 
 This project includes a script to automate the process of extracting the Falco plugins and building the necessary container images. This script needs to be run in an environment with internet access to pull the official Falco plugin containers.
 
@@ -51,7 +61,7 @@ This project includes a script to automate the process of extracting the Falco p
       - `localhost:5000/falcosecurity/falcosidekick-ui:2.2.0` (Sidekick UI)
       - `localhost:5000/redis:alpine` (Redis for UI)
 
-## Step 3: Start and Configure Minikube
+## 👣 Step 3: Start and Configure Minikube
 
 1.  Start Minikube:
 
@@ -65,7 +75,7 @@ This project includes a script to automate the process of extracting the Falco p
     minikube addons enable registry -p falcosecurity
     ```
 
-## Step 4: Deploy Falco to Minikube
+## 🚀 Step 4: Deploy Falco to Minikube
 
 Now that you have your images built and Minikube running, you can deploy Falco.
 
@@ -88,7 +98,7 @@ Now that you have your images built and Minikube running, you can deploy Falco.
 
 4.  The script will then deploy Falco (and Sidekick components if enabled) to your Minikube cluster using the Helm chart.
 
-## Step 5: Verify the Deployment
+## 🚀 Step 5: Verify the Deployment
 
 Once the deployment is complete, the script will display the status of the Falco pods and recent logs. You can also manually verify the deployment:
 
@@ -117,7 +127,7 @@ Once the deployment is complete, the script will display the status of the Falco
     Open your browser to [http://localhost:2802](http://localhost:2802).
     Default credentials: `admin` / `admin`.
 
-## Cleaning Up
+## 🧹 Cleaning Up
 
     helm uninstall falco -n falco
     # Verify resources are gone
