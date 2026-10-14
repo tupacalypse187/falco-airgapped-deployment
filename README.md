@@ -10,6 +10,7 @@ Jenkins-driven production deployment on AWS EKS.
 
 - [🎯 Start here](#-start-here)
 - [⚙️ How it works](#️-how-it-works)
+- [🏗️ Architecture](#️-architecture)
 - [🗂️ Directory structure](#️-directory-structure)
 - [📋 Prerequisites](#-prerequisites)
 
@@ -38,6 +39,38 @@ Jenkins-driven production deployment on AWS EKS.
    `s3` (Falco pulls plugins from a private bucket on startup).
 4. **Automate with Jenkins.** The provided `Jenkinsfile` runs the whole
    chain — extract plugins, build images, deploy to EKS.
+
+## 🏗️ Architecture
+
+Falco runs with no runtime internet dependency: plugins are extracted once in a connected staging environment, baked into AlmaLinux 9 images, and distributed through a private ECR registry. One Helm chart deploys the Falco DaemonSet to EKS, and a values switch chooses how plugins reach the pod — a plugin-loader init container (sidecar strategy) or a pre-start download from a private S3 bucket (S3 strategy).
+
+```mermaid
+flowchart LR
+    subgraph Staging["🌐 Connected staging"]
+        Official["🦅 Official Falco containers"] -->|extract-plugins.sh| Plugins["🧩 Extracted .so plugins"]
+        Plugins --> Build["🔨 AlmaLinux 9 builds"]
+        Build --> Images["🐳 Base / S3-loader /<br/>plugin-loader images"]
+    end
+    Images --> ECR["📦 Private ECR"]
+    Plugins -.->|S3 strategy| S3["🪣 Private S3 bucket"]
+    subgraph Cluster["☸️ AWS EKS"]
+        Helm["⎈ Helm chart<br/>falco-airgapped"] --> DS["🦅 Falco DaemonSet"]
+    end
+    ECR -->|Jenkins pipeline| Helm
+    Images -.->|sidecar strategy| DS
+    S3 -.->|pre-start download| DS
+    Images --> Local["💻 Local registry :5000"]
+    Local --> Mini["🧪 Minikube test"]
+    Helm -.-> Mini
+```
+
+**Components**
+
+- **Plugin extraction** (`scripts/local/extract-plugins.sh`, `plugins/`) — pulls the official Falco plugin containers and extracts the compiled `container` and `k8saudit-eks` `.so` files; no cmake or source builds.
+- **Custom images** (`docker/base/`, `docker/plugin-loader/`) — the Falco base image, an S3-loader variant with the AWS CLI, and the plugin-loader sidecar image, all on AlmaLinux 9.
+- **Helm chart** (`helm/falco-airgapped/`) — DaemonSet, ConfigMap, RBAC, and Service templates; `values.yaml` selects the `sidecar` or `s3` plugin strategy.
+- **Jenkins pipeline** (`jenkins/Jenkinsfile`) — orchestrates plugin extraction, optional S3 upload, parallel image builds, ECR push, and Helm deployment to EKS, parameterized per environment.
+- **Local path** (`scripts/local/`, `docs/README_LOCAL.md`) — the same images are pushed to a local registry (`localhost:5000`) and the same chart deploys to Minikube for offline testing.
 
 ## 🗂️ Directory structure
 
